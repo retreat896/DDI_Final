@@ -1,0 +1,21 @@
+{
+  "name": "steam-profile-dashboard",
+  "version": "1.0.0",
+  "description": "Data visualization web app for Steam profiles.",
+  "scripts": {
+    "postinstall": "cd frontend && npm install && cd ../cloudflare-backend && npm install && cd ../backend && python -m venv venv && .\\venv\\Scripts\\pip install -r requirements.txt",
+    "dev:db": "docker compose -f database/docker-compose.yml up -d",
+    "dev:backend": "cd backend && .\\venv\\Scripts\\flask run --port=5000",
+    "dev:cf": "cd cloudflare-backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev": "npm run dev:db && concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:edge": "concurrently \"npm run dev:cf\" \"npm run dev:frontend\"",
+    "build:frontend": "cd frontend && npm run build",
+    "build": "npm run build:frontend",
+    "preview:frontend": "cd frontend && npm run preview",
+    "preview": "npm run dev:db && concurrently \"npm run dev:backend\" \"npm run preview:frontend\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
