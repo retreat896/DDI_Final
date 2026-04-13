@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 
-function PlaytimeBarChart({ games }) {
+function PlaytimeBarChart({ games, onGameClick }) {
   const chartRef = useRef();
   
   useEffect(() => {
@@ -13,6 +13,7 @@ function PlaytimeBarChart({ games }) {
       .sort((a, b) => b.playtime_forever - a.playtime_forever)
       .slice(0, 15)
       .map(g => ({
+        appid: g.appid,
         name: g.name,
         hours: (g.playtime_forever / 60).toFixed(1)
       }));
@@ -85,6 +86,10 @@ function PlaytimeBarChart({ games }) {
       .attr('height', d => height - y(d.hours))
       .attr('fill', 'url(#barGradient)')
       .attr('rx', 4)
+      .style('cursor', onGameClick ? 'pointer' : 'default')
+      .on('click', (event, d) => {
+        if (onGameClick) onGameClick(d.appid);
+      })
       .on('mouseover', (event, d) => {
         d3.select(event.currentTarget).attr('fill', '#60a5fa');
         tooltip.transition().duration(200).style('opacity', 1);

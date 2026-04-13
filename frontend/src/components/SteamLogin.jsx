@@ -6,8 +6,14 @@ function SteamLogin() {
   const navigate = useNavigate();
   
   useEffect(() => {
+    const getCookie = (name) => {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop().split(';').shift();
+      return null;
+    };
     const params = new URLSearchParams(location.search);
-    const steamid = params.get('steamid');
+    const steamid = params.get('steamid') || getCookie('steamid');
     if (steamid) {
       localStorage.setItem('steamid', steamid);
       navigate('/dashboard');

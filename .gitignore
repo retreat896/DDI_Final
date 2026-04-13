@@ -9,3 +9,5 @@ backend/venv313/
 backend/venv314/
 backend/venv315/
 backend/.env
+
+/datasets
