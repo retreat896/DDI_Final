@@ -11,3 +11,5 @@ backend/venv315/
 backend/.env
 
 /datasets
+package-lock.json
+cloudflare-backend/package-lock.json
