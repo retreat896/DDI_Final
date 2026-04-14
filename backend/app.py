@@ -178,10 +178,6 @@ def sync_single_game(appid):
 def get_price_history(appid):
     try:
         conn = get_db_connection()
-        
-        # Ensure we have the latest steam data
-        _fetch_steam_app(conn, appid)
-        
         cur = conn.cursor(row_factory=dict_row)
         cur.execute('''
             SELECT price_initial, price_final, discount_percent, recorded_at 
