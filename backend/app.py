@@ -59,6 +59,59 @@ def auth_callback():
             return resp
     return redirect(f"{FRONTEND_URL}?error=authentication_failed")
 
+@app.route('/api/auth/resolve', methods=['POST'])
+def resolve_steam_id():
+    try:
+        data = request.json
+        input_str = data.get('input', '').strip()
+        if not input_str:
+            return jsonify({"error": "Input is required"}), 400
+        
+        steam_id = None
+        
+        # 1. 17-digit numerical string
+        if re.match(r'^\d{17}$', input_str):
+            steam_id = input_str
+        
+        # 2. profile URL
+        elif '/profiles/' in input_str:
+            match = re.search(r'/profiles/(\d+)', input_str)
+            if match:
+                steam_id = match.group(1)
+                
+        # 3. Vanity URL (string or /id/string)
+        else:
+            vanity = input_str
+            if '/id/' in input_str:
+                match = re.search(r'/id/([^/]+)', input_str)
+                if match:
+                    vanity = match.group(1)
+            # Remove trailing slashes just in case
+            vanity = vanity.rstrip('/')
+            
+            # Use Steam API to resolve vanity URL
+            if STEAM_API_KEY:
+                resolve_url = f"http://api.steampowered.com/ISteamUser/ResolveVanityURL/v0001/?key={STEAM_API_KEY}&vanityurl={vanity}"
+                r = requests.get(resolve_url)
+                if r.status_code == 200:
+                    resp = r.json().get('response', {})
+                    if resp.get('success') == 1:
+                        steam_id = resp.get('steamid')
+                    else:
+                        return jsonify({"error": "Could not resolve custom URL to a Steam ID. Make sure it is correct and public."}), 404
+            else:
+                return jsonify({"error": "STEAM_API_KEY not configured on server"}), 500
+
+        if steam_id:
+            # Fetch profile to cache it in DB immediately
+            _fetch_and_store_profile(steam_id)
+            return jsonify({"steamid": steam_id})
+        
+        return jsonify({"error": "Invalid input format"}), 400
+    except Exception as e:
+        print(f"Error resolving Steam ID: {e}")
+        return jsonify({"error": str(e)}), 500
+
 def _fetch_and_store_profile(steam_id):
     if not STEAM_API_KEY:
         return
@@ -107,7 +160,7 @@ def get_player(steamid):
 
 def _fetch_steam_app(conn, appid, fallback_name=None):
     try:
-        appdetails_url = f"https://store.steampowered.com/api/appdetails/?appids={appid}"
+        appdetails_url = f"https://store.steampowered.com/api/appdetails/?appids={appid}&cc=us"
         print(f"[STEAM API] Fetching data for App ID: {appid}...")
         r = requests.get(appdetails_url)
         if r.status_code == 200:
@@ -139,11 +192,6 @@ def _fetch_steam_app(conn, appid, fallback_name=None):
                         release_date = EXCLUDED.release_date
                 ''', (appid, name, plat_win, plat_mac, plat_linux, release_date))
                 
-                if price_final is not None:
-                    cur.execute('''
-                        INSERT INTO game_price_history (appid, price_initial, price_final, discount_percent)
-                        VALUES (%s, %s, %s, %s)
-                    ''', (appid, price_initial, price_final, discount_percent))
                 conn.commit()
                 socketio.emit('game_synced', {'appid': appid, 'name': name})
                 cur.close()
@@ -179,6 +227,8 @@ def get_price_history(appid):
     try:
         conn = get_db_connection()
         cur = conn.cursor(row_factory=dict_row)
+        
+        # 0. Fetch stored historical points (past synced prices)
         cur.execute('''
             SELECT price_initial, price_final, discount_percent, recorded_at 
             FROM game_price_history 
@@ -187,6 +237,71 @@ def get_price_history(appid):
         ''', (appid,))
         history = cur.fetchall()
         
+        # 1. Fetch live price dynamically from Steam API
+        try:
+            r = requests.get(f"https://store.steampowered.com/api/appdetails/?appids={appid}&cc=us")
+            if r.status_code == 200:
+                data = r.json().get(str(appid), {})
+                if data.get('success') and 'data' in data:
+                    app_data = data['data']
+                    price_overview = app_data.get('price_overview')
+                    is_free = app_data.get('is_free')
+                    
+                    from datetime import datetime
+                    if price_overview:
+                        history.append({
+                            "price_initial": price_overview.get('initial'),
+                            "price_final": price_overview.get('final'),
+                            "discount_percent": price_overview.get('discount_percent'),
+                            "recorded_at": datetime.utcnow().isoformat() + "Z"
+                        })
+                    elif is_free:
+                        history.append({
+                            "price_initial": 0,
+                            "price_final": 0,
+                            "discount_percent": 0,
+                            "recorded_at": datetime.utcnow().isoformat() + "Z"
+                        })
+        except Exception as e:
+            print(f"Error fetching live pricing from Steam: {e}")
+        
+        # 2. Fetch Kaggle dataset's historical price and append it
+        cur.execute('''
+            SELECT ga.price_initial, ga.price_final, ga.discount_percent, rgd.fetched_at 
+            FROM game_analytics ga
+            LEFT JOIN raw_game_data rgd ON rgd.appid = ga.appid
+            WHERE ga.appid = %s::TEXT
+        ''', (appid,))
+        dataset_hist = cur.fetchone()
+        
+        if dataset_hist:
+            try:
+                def parse_price(val):
+                    if not val: return 0
+                    try: return int(float(val) * 100)
+                    except: return 0
+                
+                def parse_discount(val):
+                    if not val: return 0
+                    try: return int(float(val))
+                    except: return 0
+
+                p_init = parse_price(dataset_hist.get('price_initial'))
+                p_final = parse_price(dataset_hist.get('price_final'))
+                discount = parse_discount(dataset_hist.get('discount_percent'))
+                fetched_at = dataset_hist.get('fetched_at') or "2024-01-01T00:00:00"
+                
+                # Append dataset point with its actual fetched timestamp
+                history.append({
+                    "price_initial": p_init,
+                    "price_final": p_final,
+                    "discount_percent": discount,
+                    "recorded_at": fetched_at
+                })
+            except Exception as e:
+                print(f"Error parsing dataset history for {appid}: {e}")
+
+        # 3. Fetch Game Data
         cur.execute('''
             SELECT 
                 d.app as appid,
@@ -205,6 +320,9 @@ def get_price_history(appid):
         
         cur.close()
         conn.close()
+        
+        # Sort history by recorded_at descending just in case
+        history.sort(key=lambda x: str(x['recorded_at']), reverse=True)
         return jsonify({"game": game, "history": history})
     except Exception as e:
         print(f"Error fetching history: {e}")
