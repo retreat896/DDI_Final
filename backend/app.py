@@ -149,10 +149,14 @@ def _fetch_steam_app(conn, appid, fallback_name=None):
                 cur.close()
     except Exception as e:
         print(f"Error fetching steam app: {e}")
+        try:
+            conn.rollback()
+        except:
+            pass
 
 def _sync_top_games(steamid, games):
     try:
-        top_games = sorted(games, key=lambda x: x.get('playtime_forever', 0), reverse=True)[:10]
+        top_games = sorted(games, key=lambda x: x.get('playtime_forever', 0), reverse=True)[:15]
         conn = get_db_connection()
         for game in top_games:
             _fetch_steam_app(conn, game.get('appid'), game.get('name'))
@@ -174,6 +178,10 @@ def sync_single_game(appid):
 def get_price_history(appid):
     try:
         conn = get_db_connection()
+        
+        # Ensure we have the latest steam data
+        _fetch_steam_app(conn, appid)
+        
         cur = conn.cursor(row_factory=dict_row)
         cur.execute('''
             SELECT price_initial, price_final, discount_percent, recorded_at 
@@ -183,7 +191,20 @@ def get_price_history(appid):
         ''', (appid,))
         history = cur.fetchall()
         
-        cur.execute("SELECT * FROM games WHERE appid = %s", (appid,))
+        cur.execute('''
+            SELECT 
+                d.app as appid,
+                COALESCE(g.name, ga.name, sg.title) as name,
+                g.platform_windows, g.platform_mac, g.platform_linux, g.release_date,
+                ga.genre_primary, ga.developer as analytics_developer, ga.publisher as analytics_publisher, 
+                ga.positive_reviews, ga.negative_reviews, ga.ccu,
+                sg.overall_review, sg.awards
+            FROM (SELECT %s::INT as app) d
+            LEFT JOIN games g ON g.appid = d.app
+            LEFT JOIN game_analytics ga ON ga.appid = d.app::TEXT
+            LEFT JOIN steam_games sg ON sg.app_id = d.app::TEXT
+            LIMIT 1
+        ''', (appid,))
         game = cur.fetchone()
         
         cur.close()
