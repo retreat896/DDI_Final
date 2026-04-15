@@ -54,21 +54,6 @@ function Dashboard() {
     fetchData();
   }, [navigate]);
 
-  useEffect(() => {
-    const socket = io(API_BASE);
-
-    socket.on('connect', () => {
-      console.log('Connected to backend socket');
-    });
-
-    socket.on('game_synced', (data) => {
-      console.log('Game synced via background task:', data);
-    });
-
-    return () => {
-      socket.disconnect();
-    };
-  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem('steamid');

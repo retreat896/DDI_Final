@@ -66,6 +66,31 @@ def extract_specific_files(datasets_dir):
                 else:
                     print(f"{file_to_extract} already exists in {datasets_dir}, skipping extraction.")
 
+def link_tables(conn):
+    print("\nLinking tables and optimizing indices...")
+    with conn.cursor() as cur:
+        # 1. game_analytics: Convert appid to INT and index it
+        print("  -> Optimizing game_analytics (appid)...")
+        cur.execute('''
+            ALTER TABLE game_analytics 
+            ALTER COLUMN appid TYPE INTEGER USING (NULLIF(appid, '')::INTEGER);
+            CREATE INDEX IF NOT EXISTS idx_game_analytics_appid ON game_analytics(appid);
+        ''')
+
+        # 2. steam_games: Convert app_id to INT and index it
+        print("  -> Optimizing steam_games (app_id)...")
+        cur.execute('''
+            ALTER TABLE steam_games 
+            ALTER COLUMN app_id TYPE INTEGER USING (NULLIF(app_id, '')::INTEGER);
+            CREATE INDEX IF NOT EXISTS idx_steam_games_appid ON steam_games(app_id);
+        ''')
+
+        # 3. games: Ensure appid is indexed
+        print("  -> Optimizing games (appid)...")
+        cur.execute('CREATE INDEX IF NOT EXISTS idx_games_appid ON games(appid);')
+        
+    print("Optimization completed.")
+
 def import_datasets():
     datasets_dir = 'datasets'
     
@@ -129,6 +154,9 @@ def import_datasets():
             print(f"     COPY completed for {csv_name}")
         except Exception as e:
             print(f"     Error copying {csv_name}: {e}")
+
+    # Link and optimize tables
+    link_tables(conn)
 
     conn.close()
     print("\nAll datasets processed.")

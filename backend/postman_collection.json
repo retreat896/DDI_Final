@@ -1,0 +1,92 @@
+{
+	"info": {
+		"_postman_id": "8c3286c8-fa84-4082-b020-f7ea7ba968e2",
+		"name": "Steam Profile Dashboard API",
+		"description": "API collection for the Steam Profile Dashboard project.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Auth",
+			"item": [
+				{
+					"name": "Login",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:5000/api/auth/login",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "5000",
+							"path": [
+								"api",
+								"auth",
+								"login"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Resolve Steam ID",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"input\": \"https://steamcommunity.com/id/gaben/\"\n}"
+						},
+						"url": {
+							"raw": "http://localhost:5000/api/auth/resolve",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "5000",
+							"path": [
+								"api",
+								"auth",
+								"resolve"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Games",
+			"item": [
+				{
+					"name": "Get Owned Games",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:5000/api/games/76561197960435530",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "5000",
+							"path": [
+								"api",
+								"games",
+								"76561197960435530"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	]
+}
