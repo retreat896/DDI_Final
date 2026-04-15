@@ -50,12 +50,31 @@ def auth_callback():
         match = re.search(r'https://steamcommunity.com/openid/id/(\d+)', claimed_id)
         if match:
             steam_id = match.group(1)
-            # Fetch profile info immediately to populate DB and cache it
-            _fetch_and_store_profile(steam_id)
-            # Redirect back to frontend and set cookie
+            
+            # Fetch profile info immediately to send to frontend via cookie
+            profile_data = {}
+            if STEAM_API_KEY:
+                url = f"http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key={STEAM_API_KEY}&steamids={steam_id}"
+                r = requests.get(url)
+                if r.status_code == 200:
+                    players = r.json().get('response', {}).get('players', [])
+                    if players:
+                        p = players[0]
+                        profile_data = {
+                            "steamid": steam_id,
+                            "persona_name": p.get('personaname'),
+                            "profile_url": p.get('profileurl'),
+                            "avatar_url": p.get('avatarfull')
+                        }
+
+            # Redirect back to frontend and set cookies
+            import json
             from flask import make_response
             resp = redirect(f"{FRONTEND_URL}")
             resp.set_cookie('steamid', steam_id, max_age=86400*30, httponly=False, samesite='Lax')
+            if profile_data:
+                profile_json = json.dumps(profile_data)
+                resp.set_cookie('user_profile', urllib.parse.quote(profile_json), max_age=86400*30, httponly=False, samesite='Lax')
             return resp
     return redirect(f"{FRONTEND_URL}?error=authentication_failed")
 
@@ -103,60 +122,27 @@ def resolve_steam_id():
                 return jsonify({"error": "STEAM_API_KEY not configured on server"}), 500
 
         if steam_id:
-            # Fetch profile to cache it in DB immediately
-            _fetch_and_store_profile(steam_id)
-            return jsonify({"steamid": steam_id})
+            # Fetch profile data to return to frontend for local storage/cookie
+            profile_data = {"steamid": steam_id}
+            if STEAM_API_KEY:
+                resolve_info_url = f"http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key={STEAM_API_KEY}&steamids={steam_id}"
+                r = requests.get(resolve_info_url)
+                if r.status_code == 200:
+                    players = r.json().get('response', {}).get('players', [])
+                    if players:
+                        p = players[0]
+                        profile_data.update({
+                            "persona_name": p.get('personaname'),
+                            "profile_url": p.get('profileurl'),
+                            "avatar_url": p.get('avatarfull')
+                        })
+            return jsonify(profile_data)
         
         return jsonify({"error": "Invalid input format"}), 400
     except Exception as e:
         print(f"Error resolving Steam ID: {e}")
         return jsonify({"error": str(e)}), 500
 
-def _fetch_and_store_profile(steam_id):
-    if not STEAM_API_KEY:
-        return
-        
-    url = f"http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key={STEAM_API_KEY}&steamids={steam_id}"
-    r = requests.get(url)
-    if r.status_code == 200:
-        data = r.json()
-        players = data.get('response', {}).get('players', [])
-        if players:
-            p = players[0]
-            try:
-                conn = get_db_connection()
-                cur = conn.cursor()
-                cur.execute('''
-                    INSERT INTO users (steam_id, persona_name, profile_url, avatar_url, last_login)
-                    VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP)
-                    ON CONFLICT (steam_id) DO UPDATE SET
-                        persona_name = EXCLUDED.persona_name,
-                        profile_url = EXCLUDED.profile_url,
-                        avatar_url = EXCLUDED.avatar_url,
-                        last_login = CURRENT_TIMESTAMP
-                ''', (steam_id, p.get('personaname'), p.get('profileurl'), p.get('avatarfull')))
-                conn.commit()
-                cur.close()
-                conn.close()
-            except Exception as e:
-                print(f"Error storing profile: {e}")
-
-@app.route('/api/player/<steamid>')
-def get_player(steamid):
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor(row_factory=dict_row)
-        cur.execute("SELECT * FROM users WHERE steam_id = %s", (steamid,))
-        player = cur.fetchone()
-        cur.close()
-        conn.close()
-        
-        if player:
-            return jsonify(player)
-    except Exception as e:
-        print(f"Error reading profile: {e}")
-    
-    return jsonify({"error": "Player not found"}), 404
 
 def _fetch_steam_app(conn, appid, fallback_name=None):
     try:

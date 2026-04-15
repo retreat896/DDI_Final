@@ -39,6 +39,9 @@ function SteamLogin() {
       const res = await axios.post(`${API_BASE}/api/auth/resolve`, { input: inputVal });
       if (res.data.steamid) {
         localStorage.setItem('steamid', res.data.steamid);
+        // Set cookies locally for manual resolution
+        document.cookie = `steamid=${res.data.steamid}; Max-Age=${86400*30}; path=/; SameSite=Lax`;
+        document.cookie = `user_profile=${encodeURIComponent(JSON.stringify(res.data))}; Max-Age=${86400*30}; path=/; SameSite=Lax`;
         navigate('/dashboard');
       }
     } catch (err) {

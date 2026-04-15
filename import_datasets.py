@@ -3,6 +3,7 @@ import os
 import csv
 import psycopg
 import re
+import urllib.request
 
 # Database connection details
 DB_PARAMS = {
@@ -13,6 +14,18 @@ DB_PARAMS = {
     "port": "5432"
 }
 
+# Dataset download URLs
+DATASETS = {
+    "steam-full-market-dataset.zip": "https://www.kaggle.com/api/v1/datasets/download/evyatarbensegal/steam-full-market-dataset",
+    "steam-store-data.zip": "https://www.kaggle.com/api/v1/datasets/download/amanbarthwal/steam-store-data"
+}
+
+# Specific files to extract
+FILES_TO_EXTRACT = {
+    "steam-full-market-dataset.zip": ["game_analytics.csv"],
+    "steam-store-data.zip": ["steam-games.csv"]
+}
+
 def clean_name(name):
     name = name.strip().lower()
     name = re.sub(r'[^a-z0-9_]', '_', name)
@@ -20,8 +33,47 @@ def clean_name(name):
         name = '_' + name
     return name
 
+def download_datasets(datasets_dir):
+    if not os.path.exists(datasets_dir):
+        os.makedirs(datasets_dir)
+        print(f"Created directory: {datasets_dir}")
+
+    for filename, url in DATASETS.items():
+        path = os.path.join(datasets_dir, filename)
+        if not os.path.exists(path):
+            print(f"Downloading {filename} from {url}...")
+            try:
+                urllib.request.urlretrieve(url, path)
+                print(f"Successfully downloaded {filename}")
+            except Exception as e:
+                print(f"Failed to download {filename}: {e}")
+        else:
+            print(f"Dataset zip '{filename}' already exists, skipping download.")
+
+def extract_specific_files(datasets_dir):
+    for zip_name, files in FILES_TO_EXTRACT.items():
+        zip_path = os.path.join(datasets_dir, zip_name)
+        if not os.path.exists(zip_path):
+            continue
+        
+        with zipfile.ZipFile(zip_path, 'r') as z:
+            for file_to_extract in files:
+                target_path = os.path.join(datasets_dir, file_to_extract)
+                if not os.path.exists(target_path):
+                    print(f"Extracting {file_to_extract} from {zip_name}...")
+                    z.extract(file_to_extract, datasets_dir)
+                    print(f"Extracted to {target_path}")
+                else:
+                    print(f"{file_to_extract} already exists in {datasets_dir}, skipping extraction.")
+
 def import_datasets():
-    print("Connecting to database...")
+    datasets_dir = 'datasets'
+    
+    # Ensure datasets are downloaded and extracted
+    download_datasets(datasets_dir)
+    extract_specific_files(datasets_dir)
+
+    print("\nConnecting to database...")
     try:
         conn = psycopg.connect(**DB_PARAMS)
     except Exception as e:
@@ -29,65 +81,57 @@ def import_datasets():
         return
 
     conn.autocommit = True
-    datasets_dir = 'datasets'
 
-    for zip_name in os.listdir(datasets_dir):
-        if not zip_name.endswith('.zip'):
+    # Import target CSV files
+    target_csvs = ["game_analytics.csv", "steam-games.csv"]
+    
+    for csv_name in target_csvs:
+        csv_path = os.path.join(datasets_dir, csv_name)
+        if not os.path.exists(csv_path):
+            print(f"Skipping {csv_name} (not found)...")
             continue
             
-        zip_path = os.path.join(datasets_dir, zip_name)
-        print(f"Processing zip file: {zip_path}")
+        table_name = clean_name(os.path.splitext(csv_name)[0])
+        print(f"\n  -> Processing {csv_name} into table {table_name}")
         
-        with zipfile.ZipFile(zip_path, 'r') as z:
-            for file_info in z.infolist():
-                if not file_info.filename.endswith('.csv'):
-                    continue
-                
-                # Exclude macOS resource fork files like __MACOSX/._steam-games.csv
-                if file_info.filename.startswith('__MACOSX') or os.path.basename(file_info.filename).startswith('._'):
-                    continue
-
-                table_name = clean_name(os.path.splitext(os.path.basename(file_info.filename))[0])
-                print(f"\n  -> Extracting and inserting {file_info.filename} to table {table_name}")
-                
-                # Get Headers first
-                with z.open(file_info.filename) as f:
-                    first_line = f.readline().decode('utf-8', errors='ignore')
-                    reader = csv.reader([first_line])
-                    headers = next(reader)
-                    
-                    cleaned_headers = [clean_name(h) for h in headers]
-                    seen = {}
-                    final_headers = []
-                    for h in cleaned_headers:
-                        if h in seen:
-                            seen[h] += 1
-                            final_headers.append(f"{h}_{seen[h]}")
-                        else:
-                            seen[h] = 0
-                            final_headers.append(h)
-                    
-                    columns_def = ", ".join([f'"{h}" TEXT' for h in final_headers])
-                    create_query = f'DROP TABLE IF EXISTS "{table_name}"; CREATE TABLE "{table_name}" ({columns_def});'
-                    
-                    with conn.cursor() as cur:
-                        cur.execute(create_query)
-                        print(f"     Created table {table_name} with {len(final_headers)} columns.")
-                
-                # Stream the whole file directly to DB
-                with z.open(file_info.filename) as f:
-                    print(f"     Starting COPY from {file_info.filename}...")
-                    try:
-                        with conn.cursor() as cur:
-                            with cur.copy(f'COPY "{table_name}" FROM STDIN WITH (FORMAT CSV, HEADER)') as copy:
-                                while data := f.read(65536):
-                                    copy.write(data)
-                        print(f"     COPY completed for {file_info.filename}")
-                    except Exception as e:
-                        print(f"     Error copying {file_info.filename}: {e}")
+        # Get Headers first
+        with open(csv_path, 'r', encoding='utf-8', errors='ignore') as f:
+            first_line = f.readline()
+            reader = csv.reader([first_line])
+            headers = next(reader)
+            
+            cleaned_headers = [clean_name(h) for h in headers]
+            seen = {}
+            final_headers = []
+            for h in cleaned_headers:
+                if h in seen:
+                    seen[h] += 1
+                    final_headers.append(f"{h}_{seen[h]}")
+                else:
+                    seen[h] = 0
+                    final_headers.append(h)
+            
+            columns_def = ", ".join([f'"{h}" TEXT' for h in final_headers])
+            create_query = f'DROP TABLE IF EXISTS "{table_name}"; CREATE TABLE "{table_name}" ({columns_def});'
+            
+            with conn.cursor() as cur:
+                cur.execute(create_query)
+                print(f"     Created table {table_name} with {len(final_headers)} columns.")
+        
+        # Stream the file directly to DB
+        print(f"     Starting COPY from {csv_name}...")
+        try:
+            with open(csv_path, 'rb') as f:
+                with conn.cursor() as cur:
+                    with cur.copy(f'COPY "{table_name}" FROM STDIN WITH (FORMAT CSV, HEADER)') as copy:
+                        while data := f.read(65536):
+                            copy.write(data)
+            print(f"     COPY completed for {csv_name}")
+        except Exception as e:
+            print(f"     Error copying {csv_name}: {e}")
 
     conn.close()
-    print("All datasets processed.")
+    print("\nAll datasets processed.")
 
 if __name__ == '__main__':
     import_datasets()

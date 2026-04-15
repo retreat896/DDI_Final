@@ -21,8 +21,24 @@ function Dashboard() {
 
     const fetchData = async () => {
       try {
-        const playerRes = await axios.get(`${API_BASE}/api/player/${steamid}`);
-        setPlayer(playerRes.data);
+        const getCookie = (name) => {
+          const value = `; ${document.cookie}`;
+          const parts = value.split(`; ${name}=`);
+          if (parts.length === 2) return parts.pop().split(';').shift();
+          return null;
+        };
+
+        const cookieProfile = getCookie('user_profile');
+        if (cookieProfile) {
+          try {
+            setPlayer(JSON.parse(decodeURIComponent(cookieProfile)));
+          } catch (e) {
+            console.error("Error parsing profile cookie", e);
+            setPlayer({ steam_id: steamid });
+          }
+        } else {
+          setPlayer({ steam_id: steamid });
+        }
 
         const gamesRes = await axios.get(`${API_BASE}/api/games/${steamid}`);
         if (gamesRes.data.response && gamesRes.data.response.games) {
