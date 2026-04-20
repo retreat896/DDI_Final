@@ -1,0 +1,47 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "steam-profile-metrics",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-04-18",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "preview_urls": false,
+  "upload_source_maps": true,
+  "observability": {
+    "enabled": true
+  },
+  /**
+   * Static assets — the built React frontend.
+   * `npm run dev` builds the frontend first, then wrangler serves dist/.
+   * For hot-reload dev, run `node build-frontend.mjs --watch` in a second terminal.
+   */
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  },
+  /**
+   * D1 SQLite database binding.
+   *
+   * First time setup:
+   *   npx wrangler d1 create steam-db
+   *
+   * Then paste the returned "id" below.
+   * The database_name must stay "steam-db" to match seed-d1.mjs.
+   */
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "steam-db",
+      "database_id": "5a65f5e7-bd2b-4831-b444-08bb81fc7955"
+    }
+  ],
+  /**
+   * Non-sensitive runtime variables.
+   * Update FRONTEND_URL once you know your deployed Workers domain.
+   *
+   * Store your Steam API key as a secret — never commit it:
+   *   npx wrangler secret put STEAM_API_KEY
+   */
+  "vars": {}
+}

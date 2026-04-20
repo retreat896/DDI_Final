@@ -222,5 +222,202 @@ def get_games(steamid):
         return jsonify(r.json())
     return jsonify({"error": "Failed to fetch games"}), 500
 
+@app.route('/api/analytics/genres')
+def analytics_genres():
+    """
+    Top genres by number of games in the database.
+    ---
+    responses:
+      200:
+        description: List of {genre, count} objects sorted descending.
+      500:
+        description: Database error.
+    """
+    try:
+        conn = get_db_connection()
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute("""
+                SELECT genre_primary AS genre, COUNT(*) AS count
+                FROM game_analytics
+                WHERE genre_primary IS NOT NULL AND genre_primary <> ''
+                GROUP BY genre_primary
+                ORDER BY count DESC
+                LIMIT 20;
+            """)
+            rows = cur.fetchall()
+        conn.close()
+        return jsonify(rows)
+    except Exception as e:
+        print(f"Error in analytics_genres: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/analytics/review-distribution')
+def analytics_review_distribution():
+    """
+    Distribution of overall review scores (bucketed into 5-point bands).
+    ---
+    responses:
+      200:
+        description: List of {bucket, count} objects.
+      500:
+        description: Database error.
+    """
+    try:
+        conn = get_db_connection()
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute("""
+                SELECT
+                    (FLOOR(CAST(NULLIF(overall_review__, '') AS NUMERIC) / 5) * 5)::INT AS bucket,
+                    COUNT(*) AS count
+                FROM steam_games
+                WHERE overall_review__ IS NOT NULL AND overall_review__ <> ''
+                GROUP BY bucket
+                ORDER BY bucket;
+            """)
+            rows = cur.fetchall()
+        conn.close()
+        return jsonify(rows)
+    except Exception as e:
+        print(f"Error in analytics_review_distribution: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/analytics/price-vs-reviews')
+def analytics_price_vs_reviews():
+    """
+    Sample of games with price and review score for scatter plot.
+    ---
+    responses:
+      200:
+        description: List of {name, price, review_pct, review_count} sampled data points.
+      500:
+        description: Database error.
+    """
+    try:
+        conn = get_db_connection()
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute("""
+                SELECT
+                    name,
+                    CAST(NULLIF(price_final, '') AS NUMERIC) / 100.0 AS price,
+                    CAST(NULLIF(positive_reviews, '') AS INT) AS positive_reviews,
+                    CAST(NULLIF(negative_reviews, '') AS INT) AS negative_reviews,
+                    CAST(NULLIF(owners_midpoint, '') AS INT) AS owners_midpoint
+                FROM game_analytics
+                WHERE price_final IS NOT NULL
+                  AND price_final <> ''
+                  AND price_final <> '0'
+                  AND positive_reviews IS NOT NULL
+                  AND positive_reviews <> ''
+                  AND negative_reviews IS NOT NULL
+                  AND negative_reviews <> ''
+                ORDER BY RANDOM()
+                LIMIT 500;
+            """)
+            rows = []
+            for r in cur.fetchall():
+                pos = r.get('positive_reviews') or 0
+                neg = r.get('negative_reviews') or 0
+                total = pos + neg
+                row = dict(r)
+                row['review_pct'] = round((pos / total) * 100, 1) if total > 0 else None
+                row['total_reviews'] = total
+                rows.append(row)
+        conn.close()
+        # Filter out rows missing computed fields
+        rows = [r for r in rows if r.get('price') and r.get('review_pct') is not None]
+        return jsonify(rows)
+    except Exception as e:
+        print(f"Error in analytics_price_vs_reviews: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/analytics/publisher-tiers')
+def analytics_publisher_tiers():
+    """
+    Games grouped by publisher tier with avg review score breakdown.
+    ---
+    responses:
+      200:
+        description: List of {tier, game_count, avg_positive_pct, avg_owners} objects.
+      500:
+        description: Database error.
+    """
+    try:
+        conn = get_db_connection()
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute("""
+                SELECT
+                    publisher_tier AS tier,
+                    COUNT(*) AS game_count,
+                    ROUND(AVG(
+                        CASE
+                            WHEN (CAST(NULLIF(positive_reviews,'') AS NUMERIC) + CAST(NULLIF(negative_reviews,'') AS NUMERIC)) > 0
+                            THEN CAST(NULLIF(positive_reviews,'') AS NUMERIC) /
+                                 (CAST(NULLIF(positive_reviews,'') AS NUMERIC) + CAST(NULLIF(negative_reviews,'') AS NUMERIC)) * 100
+                        END
+                    ), 1) AS avg_positive_pct,
+                    ROUND(AVG(CAST(NULLIF(owners_midpoint,'') AS NUMERIC))) AS avg_owners
+                FROM game_analytics
+                WHERE publisher_tier IS NOT NULL AND publisher_tier <> ''
+                GROUP BY publisher_tier
+                ORDER BY
+                    CASE publisher_tier
+                        WHEN 'Indie' THEN 1
+                        WHEN 'AA' THEN 2
+                        WHEN 'AAA' THEN 3
+                        ELSE 4
+                    END;
+            """)
+            rows = cur.fetchall()
+        conn.close()
+        return jsonify(rows)
+    except Exception as e:
+        print(f"Error in analytics_publisher_tiers: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/analytics/top-owned')
+def analytics_top_owned():
+    """
+    Top games in the database by estimated ownership (owners_midpoint).
+    ---
+    parameters:
+      - name: limit
+        in: query
+        type: integer
+        default: 20
+    responses:
+      200:
+        description: List of {appid, name, owners_midpoint, genre_primary, positive_reviews, negative_reviews}.
+      500:
+        description: Database error.
+    """
+    try:
+        limit = min(int(request.args.get('limit', 20)), 50)
+        conn = get_db_connection()
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute("""
+                SELECT
+                    appid,
+                    name,
+                    CAST(NULLIF(owners_midpoint,'') AS BIGINT) AS owners_midpoint,
+                    genre_primary,
+                    CAST(NULLIF(positive_reviews,'') AS INT) AS positive_reviews,
+                    CAST(NULLIF(negative_reviews,'') AS INT) AS negative_reviews
+                FROM game_analytics
+                WHERE owners_midpoint IS NOT NULL AND owners_midpoint <> '0' AND owners_midpoint <> ''
+                ORDER BY CAST(NULLIF(owners_midpoint,'') AS BIGINT) DESC
+                LIMIT %s;
+            """, (limit,))
+            rows = cur.fetchall()
+        conn.close()
+        return jsonify(rows)
+    except Exception as e:
+        print(f"Error in analytics_top_owned: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 if __name__ == '__main__':
     socketio.run(app, port=5000, debug=True)

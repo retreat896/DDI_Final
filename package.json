@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "description": "Data visualization web app for Steam profiles.",
   "scripts": {
-    "postinstall": "cd frontend && npm install && cd ../cloudflare-backend && npm install && cd ../backend && python -m venv venv && .\\venv\\Scripts\\pip install -r requirements.txt",
+    "postinstall": "cd frontend && npm install && cd ../cloudflare-worker && npm install && cd ../backend && python -m venv venv && .\\venv\\Scripts\\pip install -r requirements.txt",
     "dev:db": "docker compose -f database/docker-compose.yml up -d",
     "dev:backend": "cd backend && .\\venv\\Scripts\\flask run --debug --port=5000",
-    "dev:cf": "cd cloudflare-backend && npm run dev",
+    "dev:cf": "cd cloudflare-worker && npm run dev",
     "dev:frontend": "cd frontend && npm run dev",
     "dev": "npm run dev:db && concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:edge": "concurrently \"npm run dev:cf\" \"npm run dev:frontend\"",
@@ -15,7 +15,8 @@
     "preview:frontend": "cd frontend && npm run preview",
     "preview": "npm run dev:db && concurrently \"npm run dev:backend\" \"npm run preview:frontend\"",
     "download-datasets": "node -e \"const fs=require('fs'); if(!fs.existsSync('datasets')) fs.mkdirSync('datasets');\" && curl -L -o datasets/steam-full-market-dataset.zip https://www.kaggle.com/api/v1/datasets/download/evyatarbensegal/steam-full-market-dataset && curl -L -o datasets/steam-store-data.zip https://www.kaggle.com/api/v1/datasets/download/amanbarthwal/steam-store-data && python -c \"import zipfile, os; [zipfile.ZipFile(f'datasets/{z}').extract(f, 'datasets') for z, f in [('steam-full-market-dataset.zip', 'game_analytics.csv'), ('steam-store-data.zip', 'steam-games.csv')]]\"",
-    "import-datasets": "python import_datasets.py"
+    "import-datasets": "python import_datasets.py",
+    "deploy": "cd cloudflare-worker && npm run deploy"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
