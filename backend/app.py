@@ -40,7 +40,7 @@ STEAM_API_KEY = os.getenv("STEAM_API_KEY", "")
 FRONTEND_URL = "http://localhost:5173"
 STEAM_OPENID_URL = "https://steamcommunity.com/openid/login"
 
-@app.route('/api/auth/login')
+@app.route('/api/auth/steam')
 def login():
     """
     Initiate Steam OpenID login flow.
@@ -49,7 +49,6 @@ def login():
       302:
         description: Redirect to Steam OpenID login page.
     """
-    # Construct Steam OpenID URL
     params = {
         'openid.ns': 'http://specs.openid.net/auth/2.0',
         'openid.mode': 'checkid_setup',
@@ -241,8 +240,7 @@ def analytics_genres():
                 FROM game_analytics
                 WHERE genre_primary IS NOT NULL AND genre_primary <> ''
                 GROUP BY genre_primary
-                ORDER BY count DESC
-                LIMIT 20;
+                ORDER BY count DESC;
             """)
             rows = cur.fetchall()
         conn.close()
@@ -283,14 +281,14 @@ def analytics_review_distribution():
         return jsonify({"error": str(e)}), 500
 
 
-@app.route('/api/analytics/price-vs-reviews')
-def analytics_price_vs_reviews():
+@app.route('/api/analytics/price-distribution')
+def analytics_price_distribution():
     """
-    Sample of games with price and review score for scatter plot.
+    Distribution of games by price bracket.
     ---
     responses:
       200:
-        description: List of {name, price, review_pct, review_count} sampled data points.
+        description: List of {bucket, count} objects.
       500:
         description: Database error.
     """
@@ -299,37 +297,49 @@ def analytics_price_vs_reviews():
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute("""
                 SELECT
-                    name,
-                    CAST(NULLIF(price_final, '') AS NUMERIC) / 100.0 AS price,
-                    CAST(NULLIF(positive_reviews, '') AS INT) AS positive_reviews,
-                    CAST(NULLIF(negative_reviews, '') AS INT) AS negative_reviews,
-                    CAST(NULLIF(owners_midpoint, '') AS INT) AS owners_midpoint
+                    CASE
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) =   0 THEN 'Free'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <   1 THEN 'Under $1'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <   2 THEN '$1'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <   3 THEN '$2'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <   4 THEN '$3'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <   5 THEN '$4'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <   6 THEN '$5'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <   7 THEN '$6'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <   8 THEN '$7'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <   9 THEN '$8'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <  10 THEN '$9'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <  11 THEN '$10'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <  12 THEN '$11'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <  13 THEN '$12'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <  14 THEN '$13'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <  15 THEN '$14'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <  16 THEN '$15'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <  17 THEN '$16'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <  18 THEN '$17'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <  19 THEN '$18'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <  20 THEN '$19'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <  30 THEN '$20-$29'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <  40 THEN '$30-$39'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <  50 THEN '$40-$49'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <  60 THEN '$50-$59'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <  70 THEN '$60-$69'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <  80 THEN '$70-$79'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <  90 THEN '$80-$89'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) < 100 THEN '$90-$99'
+                        ELSE '$100+'
+                    END AS bucket,
+                    COUNT(*) AS count
                 FROM game_analytics
-                WHERE price_final IS NOT NULL
-                  AND price_final <> ''
-                  AND price_final <> '0'
-                  AND positive_reviews IS NOT NULL
-                  AND positive_reviews <> ''
-                  AND negative_reviews IS NOT NULL
-                  AND negative_reviews <> ''
-                ORDER BY RANDOM()
-                LIMIT 500;
+                WHERE price_final IS NOT NULL AND price_final <> ''
+                GROUP BY bucket
+                ORDER BY MIN(CAST(NULLIF(price_final,'') AS NUMERIC));
             """)
-            rows = []
-            for r in cur.fetchall():
-                pos = r.get('positive_reviews') or 0
-                neg = r.get('negative_reviews') or 0
-                total = pos + neg
-                row = dict(r)
-                row['review_pct'] = round((pos / total) * 100, 1) if total > 0 else None
-                row['total_reviews'] = total
-                rows.append(row)
+            rows = cur.fetchall()
         conn.close()
-        # Filter out rows missing computed fields
-        rows = [r for r in rows if r.get('price') and r.get('review_pct') is not None]
         return jsonify(rows)
     except Exception as e:
-        print(f"Error in analytics_price_vs_reviews: {e}")
+        print(f"Error in analytics_price_distribution: {e}")
         return jsonify({"error": str(e)}), 500
 
 
@@ -416,6 +426,80 @@ def analytics_top_owned():
         return jsonify(rows)
     except Exception as e:
         print(f"Error in analytics_top_owned: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/analytics/releases-by-year')
+def analytics_releases_by_year():
+    try:
+        conn = get_db_connection()
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute("""
+                SELECT 
+                    SUBSTRING(release_date, 1, 4) AS year, 
+                    COUNT(*) AS count 
+                FROM game_analytics 
+                WHERE release_date IS NOT NULL 
+                  AND release_date <> '' 
+                  AND CAST(SUBSTRING(release_date, 1, 4) AS INTEGER) BETWEEN 2000 AND 2025
+                GROUP BY year 
+                ORDER BY year ASC;
+            """)
+            rows = cur.fetchall()
+        conn.close()
+        return jsonify(rows)
+    except Exception as e:
+        print(f"Error in analytics_releases_by_year: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/analytics/peak-ccu')
+def analytics_peak_ccu():
+    try:
+        limit = min(int(request.args.get('limit', 25)), 100)
+        conn = get_db_connection()
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute("""
+                SELECT 
+                    appid,
+                    name, 
+                    CAST(NULLIF(peak_ccu, '') AS BIGINT) AS peak_ccu,
+                    genre_primary
+                FROM game_analytics 
+                WHERE peak_ccu IS NOT NULL AND peak_ccu <> '0' AND peak_ccu <> ''
+                ORDER BY CAST(NULLIF(peak_ccu, '') AS BIGINT) DESC 
+                LIMIT %s;
+            """, (limit,))
+            rows = cur.fetchall()
+        conn.close()
+        return jsonify(rows)
+    except Exception as e:
+        print(f"Error in analytics_peak_ccu: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/analytics/game-features')
+def analytics_game_features():
+    try:
+        conn = get_db_connection()
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute("""
+                SELECT 
+                    SUM(CASE WHEN LOWER(is_free) = 'true' THEN 1 ELSE 0 END) AS free_games, 
+                    SUM(CASE WHEN LOWER(is_early_access) = 'true' THEN 1 ELSE 0 END) AS early_access_games, 
+                    SUM(CASE WHEN LOWER(controller_support) = 'true' THEN 1 ELSE 0 END) AS controller_support_games,
+                    SUM(CASE WHEN CAST(NULLIF(achievement_count,'') AS INTEGER) > 0 THEN 1 ELSE 0 END) AS has_achievements,
+                    SUM(CASE WHEN CAST(NULLIF(dlc_count,'') AS INTEGER) > 0 THEN 1 ELSE 0 END) AS has_dlc,
+                    SUM(CASE WHEN CAST(NULLIF(languages_count,'') AS INTEGER) >= 10 THEN 1 ELSE 0 END) AS multilingual,
+                    SUM(CASE WHEN CAST(NULLIF(required_age,'') AS INTEGER) > 0 THEN 1 ELSE 0 END) AS age_restricted,
+                    COUNT(*) AS total_games 
+                FROM game_analytics;
+            """)
+            rows = cur.fetchall()
+        conn.close()
+        return jsonify(rows[0] if rows else {})
+    except Exception as e:
+        print(f"Error in analytics_game_features: {e}")
         return jsonify({"error": str(e)}), 500
 
 

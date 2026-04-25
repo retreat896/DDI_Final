@@ -55,8 +55,10 @@ function GenreBreakdownChart() {
 
     const colorScale = d3.scaleSequential(d3.interpolateCool).domain([0, data.length]);
 
-    const tooltip = d3.select('body').append('div')
-      .attr('class', 'd3-tooltip').style('opacity', 0);
+    const tooltipSelection = d3.select('body').select('.d3-genre-tooltip');
+    const tooltip = tooltipSelection.empty()
+      ? d3.select('body').append('div').attr('class', 'd3-tooltip d3-genre-tooltip').style('opacity', 0)
+      : tooltipSelection;
 
     svg.selectAll('rect')
       .data(data)
@@ -95,7 +97,7 @@ function GenreBreakdownChart() {
     return () => { d3.selectAll('.d3-tooltip').remove(); };
   }
 
-  if (loading) return <p style={{ color: '#64748b' }}>Loading genre data from database…</p>;
+  if (loading) return <div className="skeleton-graph"></div>;
   if (error) return <p style={{ color: '#ef4444' }}>{error}</p>;
   return (
     <div>

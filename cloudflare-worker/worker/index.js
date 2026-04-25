@@ -89,11 +89,19 @@ async function fetchProfile(steamId, apiKey) {
 //  AUTH
 // ═══════════════════════════════════════════════════════════════════════════
 
+app.get('/api/auth/steam', (c) => {
+  const origin = new URL(c.req.url).origin;
+  const params = openIdParams(`${origin}/api/auth/callback`, origin);
+  return Response.redirect(`https://steamcommunity.com/openid/login?${params}`, 302);
+});
+
+// Alias — keeps parity with the Python Flask backend at localhost:5000
 app.get('/api/auth/login', (c) => {
   const origin = new URL(c.req.url).origin;
   const params = openIdParams(`${origin}/api/auth/callback`, origin);
   return Response.redirect(`https://steamcommunity.com/openid/login?${params}`, 302);
 });
+
 
 app.get('/api/auth/callback', async (c) => {
   const env = c.env;
@@ -216,43 +224,56 @@ app.get('/api/analytics/review-distribution', async (c) => {
   }
 });
 
-app.get('/api/analytics/price-vs-reviews', async (c) => {
+app.get('/api/analytics/price-distribution', async (c) => {
   try {
     const { results } = await c.env.DB.prepare(`
       SELECT
-        name,
-        CAST(NULLIF(price_final, '') AS REAL) / 100.0        AS price,
-        CAST(NULLIF(positive_reviews, '') AS INTEGER)         AS positive_reviews,
-        CAST(NULLIF(negative_reviews, '') AS INTEGER)         AS negative_reviews,
-        CAST(NULLIF(owners_midpoint,  '') AS INTEGER)         AS owners_midpoint
+        CASE
+          WHEN CAST(NULLIF(price_final,'') AS REAL) =   0 THEN 'Free'
+          WHEN CAST(NULLIF(price_final,'') AS REAL) <   1 THEN 'Under $1'
+          WHEN CAST(NULLIF(price_final,'') AS REAL) <   2 THEN '$1'
+          WHEN CAST(NULLIF(price_final,'') AS REAL) <   3 THEN '$2'
+          WHEN CAST(NULLIF(price_final,'') AS REAL) <   4 THEN '$3'
+          WHEN CAST(NULLIF(price_final,'') AS REAL) <   5 THEN '$4'
+          WHEN CAST(NULLIF(price_final,'') AS REAL) <   6 THEN '$5'
+          WHEN CAST(NULLIF(price_final,'') AS REAL) <   7 THEN '$6'
+          WHEN CAST(NULLIF(price_final,'') AS REAL) <   8 THEN '$7'
+          WHEN CAST(NULLIF(price_final,'') AS REAL) <   9 THEN '$8'
+          WHEN CAST(NULLIF(price_final,'') AS REAL) <  10 THEN '$9'
+          WHEN CAST(NULLIF(price_final,'') AS REAL) <  11 THEN '$10'
+          WHEN CAST(NULLIF(price_final,'') AS REAL) <  12 THEN '$11'
+          WHEN CAST(NULLIF(price_final,'') AS REAL) <  13 THEN '$12'
+          WHEN CAST(NULLIF(price_final,'') AS REAL) <  14 THEN '$13'
+          WHEN CAST(NULLIF(price_final,'') AS REAL) <  15 THEN '$14'
+          WHEN CAST(NULLIF(price_final,'') AS REAL) <  16 THEN '$15'
+          WHEN CAST(NULLIF(price_final,'') AS REAL) <  17 THEN '$16'
+          WHEN CAST(NULLIF(price_final,'') AS REAL) <  18 THEN '$17'
+          WHEN CAST(NULLIF(price_final,'') AS REAL) <  19 THEN '$18'
+          WHEN CAST(NULLIF(price_final,'') AS REAL) <  20 THEN '$19'
+          WHEN CAST(NULLIF(price_final,'') AS REAL) <  30 THEN '$20-$29'
+          WHEN CAST(NULLIF(price_final,'') AS REAL) <  40 THEN '$30-$39'
+          WHEN CAST(NULLIF(price_final,'') AS REAL) <  50 THEN '$40-$49'
+          WHEN CAST(NULLIF(price_final,'') AS REAL) <  60 THEN '$50-$59'
+          WHEN CAST(NULLIF(price_final,'') AS REAL) <  70 THEN '$60-$69'
+          WHEN CAST(NULLIF(price_final,'') AS REAL) <  80 THEN '$70-$79'
+          WHEN CAST(NULLIF(price_final,'') AS REAL) <  90 THEN '$80-$89'
+          WHEN CAST(NULLIF(price_final,'') AS REAL) < 100 THEN '$90-$99'
+          ELSE '$100+'
+        END AS bucket,
+        COUNT(*) AS count
       FROM  game_analytics
-      WHERE price_final      IS NOT NULL AND price_final      <> '' AND price_final <> '0'
-        AND positive_reviews IS NOT NULL AND positive_reviews <> ''
-        AND negative_reviews IS NOT NULL AND negative_reviews <> ''
-      ORDER BY RANDOM()
-      LIMIT 500;
+      WHERE price_final IS NOT NULL AND price_final <> ''
+      GROUP BY bucket
+      ORDER BY MIN(CAST(NULLIF(price_final,'') AS REAL));
     `).all();
-
-    const enriched = results
-      .map(r => {
-        const pos   = Number(r.positive_reviews) || 0;
-        const neg   = Number(r.negative_reviews) || 0;
-        const total = pos + neg;
-        return {
-          ...r,
-          price:        Number(r.price),
-          review_pct:   total > 0 ? Math.round((pos / total) * 1000) / 10 : null,
-          total_reviews: total,
-        };
-      })
-      .filter(r => r.price > 0 && r.review_pct !== null);
-
-    return Response.json(enriched);
+    return Response.json(results);
   } catch (e) {
-    console.error('analytics/price-vs-reviews:', e);
+    console.error('analytics/price-distribution:', e);
     return jsonErr(e.message);
   }
 });
+
+
 
 app.get('/api/analytics/publisher-tiers', async (c) => {
   try {
@@ -313,7 +334,82 @@ app.get('/api/analytics/top-owned', async (c) => {
   }
 });
 
-// ─── 404 ─────────────────────────────────────────────────────────────────────
-app.all('*', () => new Response(null, { status: 404 }));
+app.get('/api/analytics/releases-by-year', async (c) => {
+  try {
+    const { results } = await c.env.DB.prepare(`
+      SELECT 
+        SUBSTR(release_date, 1, 4) AS year, 
+        COUNT(*) AS count 
+      FROM game_analytics 
+      WHERE release_date IS NOT NULL 
+        AND release_date <> '' 
+        AND CAST(SUBSTR(release_date, 1, 4) AS INTEGER) BETWEEN 2000 AND 2025
+      GROUP BY year 
+      ORDER BY year ASC;
+    `).all();
+    return Response.json(results);
+  } catch (e) {
+    console.error('analytics/releases-by-year:', e);
+    return jsonErr(e.message);
+  }
+});
 
-export default app;
+app.get('/api/analytics/peak-ccu', async (c) => {
+  try {
+    const limit = Math.min(parseInt(c.req.query('limit') ?? '25', 10), 100);
+    const { results } = await c.env.DB.prepare(`
+      SELECT 
+        appid,
+        name, 
+        CAST(NULLIF(peak_ccu, '') AS INTEGER) AS peak_ccu,
+        genre_primary
+      FROM game_analytics 
+      WHERE peak_ccu IS NOT NULL AND peak_ccu <> '0' AND peak_ccu <> ''
+      ORDER BY CAST(NULLIF(peak_ccu, '') AS INTEGER) DESC 
+      LIMIT ?;
+    `).bind(limit).all();
+    return Response.json(results);
+  } catch (e) {
+    console.error('analytics/peak-ccu:', e);
+    return jsonErr(e.message);
+  }
+});
+
+app.get('/api/analytics/game-features', async (c) => {
+  try {
+    const { results } = await c.env.DB.prepare(`
+      SELECT 
+        SUM(CASE WHEN LOWER(is_free) = 'true' THEN 1 ELSE 0 END) AS free_games, 
+        SUM(CASE WHEN LOWER(is_early_access) = 'true' THEN 1 ELSE 0 END) AS early_access_games, 
+        SUM(CASE WHEN LOWER(controller_support) = 'true' THEN 1 ELSE 0 END) AS controller_support_games,
+        SUM(CASE WHEN CAST(NULLIF(achievement_count,'') AS INTEGER) > 0 THEN 1 ELSE 0 END) AS has_achievements,
+        SUM(CASE WHEN CAST(NULLIF(dlc_count,'') AS INTEGER) > 0 THEN 1 ELSE 0 END) AS has_dlc,
+        SUM(CASE WHEN CAST(NULLIF(languages_count,'') AS INTEGER) >= 10 THEN 1 ELSE 0 END) AS multilingual,
+        SUM(CASE WHEN CAST(NULLIF(required_age,'') AS INTEGER) > 0 THEN 1 ELSE 0 END) AS age_restricted,
+        COUNT(*) AS total_games 
+      FROM game_analytics;
+    `).all();
+    return Response.json(results[0] || {});
+  } catch (e) {
+    console.error('analytics/game-features:', e);
+    return jsonErr(e.message);
+  }
+});
+
+// ─── Export ───────────────────────────────────────────────────────────────────
+// For routes Hono doesn't handle (i.e. non-/api/* paths like /, /dashboard),
+// fall through to Cloudflare's static asset service so the React SPA is served.
+export default {
+  async fetch(request, env, ctx) {
+    const url = new URL(request.url);
+
+    // Only route /api/* through Hono — everything else goes to static assets
+    if (url.pathname.startsWith('/api/')) {
+      return app.fetch(request, env, ctx);
+    }
+
+    // Serve static assets (React SPA) for all other routes
+    return env.ASSETS.fetch(request);
+  },
+};
+

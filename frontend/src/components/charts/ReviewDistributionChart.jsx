@@ -76,8 +76,10 @@ function ReviewDistributionChart() {
       .style('fill', '#64748b').style('font-size', '12px')
       .text('Number of Games');
 
-    const tooltip = d3.select('body').append('div')
-      .attr('class', 'd3-tooltip').style('opacity', 0);
+    const tooltipSelection = d3.select('body').select('.d3-review-tooltip');
+    const tooltip = tooltipSelection.empty()
+      ? d3.select('body').append('div').attr('class', 'd3-tooltip d3-review-tooltip').style('opacity', 0)
+      : tooltipSelection;
 
     svg.selectAll('rect')
       .data(data)
@@ -107,7 +109,7 @@ function ReviewDistributionChart() {
     return () => { d3.selectAll('.d3-tooltip').remove(); };
   }
 
-  if (loading) return <p style={{ color: '#64748b' }}>Loading review distribution from database…</p>;
+  if (loading) return <div className="skeleton-graph"></div>;
   if (error) return <p style={{ color: '#ef4444' }}>{error}</p>;
   return (
     <div>

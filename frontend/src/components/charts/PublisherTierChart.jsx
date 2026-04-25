@@ -83,8 +83,10 @@ function PublisherTierChart() {
       avg_owners_k: 'Avg Owners (k)',
     };
 
-    const tooltip = d3.select('body').append('div')
-      .attr('class', 'd3-tooltip').style('opacity', 0);
+    const tooltipSelection = d3.select('body').select('.d3-publisher-tooltip');
+    const tooltip = tooltipSelection.empty()
+      ? d3.select('body').append('div').attr('class', 'd3-tooltip d3-publisher-tooltip').style('opacity', 0)
+      : tooltipSelection;
 
     processed.forEach(d => {
       const g = svg.append('g').attr('transform', `translate(${x0(d.tier)},0)`);
@@ -137,7 +139,7 @@ function PublisherTierChart() {
     return () => { d3.selectAll('.d3-tooltip').remove(); };
   }
 
-  if (loading) return <p style={{ color: '#64748b' }}>Loading publisher tier data from database…</p>;
+  if (loading) return <div className="skeleton-graph"></div>;
   if (error) return <p style={{ color: '#ef4444' }}>{error}</p>;
   return (
     <div>

@@ -12,9 +12,12 @@ import CompareProfilesChart from './charts/CompareProfilesChart';
 // --- Database / Dataset charts ---
 import GenreBreakdownChart from './charts/GenreBreakdownChart';
 import ReviewDistributionChart from './charts/ReviewDistributionChart';
-import PriceVsReviewsChart from './charts/PriceVsReviewsChart';
+import PriceDistributionChart from './charts/PriceDistributionChart';
 import PublisherTierChart from './charts/PublisherTierChart';
 import TopOwnedGamesChart from './charts/TopOwnedGamesChart';
+import ReleaseYearChart from './charts/ReleaseYearChart';
+import PeakCCUChart from './charts/PeakCCUChart';
+import GameFeaturesChart from './charts/GameFeaturesChart';
 
 import StatsCards from './StatsCards';
 
@@ -30,9 +33,12 @@ const PERSONAL_TABS = [
 const DB_TABS = [
   { id: 'genres',     label: '🎮 Genres' },
   { id: 'reviews',    label: '⭐ Review Scores' },
-  { id: 'price',      label: '💰 Price vs Reviews' },
+  { id: 'price',      label: '💰 Price Distribution' },
   { id: 'publisher',  label: '🏢 Publisher Tiers' },
   { id: 'top-owned',  label: '🌍 Most Owned' },
+  { id: 'peak-ccu',   label: '🔥 Peak Players' },
+  { id: 'releases',   label: '📈 Game Releases' },
+  { id: 'features',   label: '✨ Features Overview' },
 ];
 
 // ─── Sub-component: tab bar ──────────────────────────────────────────────────
@@ -244,13 +250,28 @@ function Dashboard() {
             border: '1px dashed rgba(59,130,246,0.3)',
             borderRadius: '12px',
             background: 'rgba(59,130,246,0.04)',
+            position: 'relative',
+            overflow: 'hidden'
           }}>
-            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🔒</div>
-            <h3 style={{ marginBottom: '0.5rem' }}>Personal Library Analytics</h3>
-            <p style={{ color: '#64748b', maxWidth: '380px', margin: '0 auto 1.5rem' }}>
-              Sign in with your Steam account (or paste a profile URL) to see your top played games,
-              playtime breakdown, recent activity, and head-to-head comparisons.
-            </p>
+            <img 
+              src="/placeholder.png" 
+              alt="Analytics Locked"
+              style={{
+                width: '100%',
+                maxWidth: '600px',
+                borderRadius: '8px',
+                marginBottom: '1.5rem',
+                opacity: 0.8,
+                mixBlendMode: 'screen'
+              }}
+            />
+            <div style={{ position: 'relative', zIndex: 1 }}>
+              <div style={{ fontSize: '3rem', marginBottom: '1rem', marginTop: '-2rem' }}>🔒</div>
+              <h3 style={{ marginBottom: '0.5rem', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>Personal Library Analytics</h3>
+              <p style={{ color: '#94a3b8', maxWidth: '380px', margin: '0 auto 1.5rem', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
+                Sign in with your Steam account (or paste a profile URL) to see your top played games,
+                playtime breakdown, recent activity, and head-to-head comparisons.
+              </p>
             <button
               className="btn-primary"
               onClick={() => navigate('/')}
@@ -258,56 +279,59 @@ function Dashboard() {
             >
               Sign In to Unlock
             </button>
+            </div>
           </div>
         ) : (
           <>
             <TabBar tabs={PERSONAL_TABS} active={personalTab} onSelect={setPersonalTab} />
 
-            {personalTab === 'overview' && (
-              <>
-                <p style={{ color: '#64748b', fontSize: '0.8rem', margin: '0 0 0.75rem' }}>
-                  Click a bar to open the game on the Steam Store.
-                </p>
-                {games.length > 0
-                  ? <PlaytimeBarChart games={games} onGameClick={handleGameClick} />
-                  : <p style={{ color: '#475569' }}>No game data available or profile is private.</p>}
-              </>
-            )}
+            <div key={personalTab} className="tab-content">
+              {personalTab === 'overview' && (
+                <>
+                  <p style={{ color: '#64748b', fontSize: '0.8rem', margin: '0 0 0.75rem' }}>
+                    Click a bar to open the game on the Steam Store.
+                  </p>
+                  {games.length > 0
+                    ? <PlaytimeBarChart games={games} onGameClick={handleGameClick} />
+                    : <p style={{ color: '#475569' }}>No game data available or profile is private.</p>}
+                </>
+              )}
 
-            {personalTab === 'donut' && (
-              <>
-                <p style={{ color: '#64748b', fontSize: '0.8rem', margin: '0 0 0.75rem' }}>
-                  How your total playtime is split across your top 8 games vs. everything else.
-                </p>
-                {games.length > 0
-                  ? <PlaytimeDonutChart games={games} />
-                  : <p style={{ color: '#475569' }}>No game data available or profile is private.</p>}
-              </>
-            )}
+              {personalTab === 'donut' && (
+                <>
+                  <p style={{ color: '#64748b', fontSize: '0.8rem', margin: '0 0 0.75rem' }}>
+                    How your total playtime is split across your top 8 games vs. everything else.
+                  </p>
+                  {games.length > 0
+                    ? <PlaytimeDonutChart games={games} />
+                    : <p style={{ color: '#475569' }}>No game data available or profile is private.</p>}
+                </>
+              )}
 
-            {personalTab === 'scatter' && (
-              <>
-                {games.filter(g => g.playtime_2weeks > 0).length === 0
-                  ? <p style={{ color: '#64748b' }}>No recent playtime data (last 2 weeks) found for this profile.</p>
-                  : <RecentVsTotalScatter games={games} />}
-              </>
-            )}
+              {personalTab === 'scatter' && (
+                <>
+                  {games.filter(g => g.playtime_2weeks > 0).length === 0
+                    ? <p style={{ color: '#64748b' }}>No recent playtime data (last 2 weeks) found for this profile.</p>
+                    : <RecentVsTotalScatter games={games} />}
+                </>
+              )}
 
-            {personalTab === 'library' && (
-              <>
-                {games.length > 0
-                  ? <LibraryBreakdownChart games={games} />
-                  : <p style={{ color: '#475569' }}>No game data available or profile is private.</p>}
-              </>
-            )}
+              {personalTab === 'library' && (
+                <>
+                  {games.length > 0
+                    ? <LibraryBreakdownChart games={games} />
+                    : <p style={{ color: '#475569' }}>No game data available or profile is private.</p>}
+                </>
+              )}
 
-            {personalTab === 'compare' && (
-              <>
-                {games.length > 0
-                  ? <CompareProfilesChart myGames={games} myName={player?.persona_name || 'You'} />
-                  : <p style={{ color: '#475569' }}>No game data available or profile is private.</p>}
-              </>
-            )}
+              {personalTab === 'compare' && (
+                <>
+                  {games.length > 0
+                    ? <CompareProfilesChart myGames={games} myName={player?.persona_name || 'You'} />
+                    : <p style={{ color: '#475569' }}>No game data available or profile is private.</p>}
+                </>
+              )}
+            </div>
           </>
         )}
       </div>
@@ -322,50 +346,79 @@ function Dashboard() {
         />
         <TabBar tabs={DB_TABS} active={dbTab} onSelect={setDbTab} />
 
-        {dbTab === 'genres' && (
-          <>
-            <h4 style={{ margin: '0 0 0.25rem', color: '#94a3b8', fontWeight: 500, fontSize: '1rem' }}>
-              Top Genres by Game Count
-            </h4>
-            <GenreBreakdownChart />
-          </>
-        )}
+        <div key={dbTab} className="tab-content">
+          {dbTab === 'genres' && (
+            <>
+              <h4 style={{ margin: '0 0 0.25rem', color: '#94a3b8', fontWeight: 500, fontSize: '1rem' }}>
+                Top Genres by Game Count
+              </h4>
+              <GenreBreakdownChart />
+            </>
+          )}
 
-        {dbTab === 'reviews' && (
-          <>
-            <h4 style={{ margin: '0 0 0.25rem', color: '#94a3b8', fontWeight: 500, fontSize: '1rem' }}>
-              Review Score Distribution
-            </h4>
-            <ReviewDistributionChart />
-          </>
-        )}
+          {dbTab === 'reviews' && (
+            <>
+              <h4 style={{ margin: '0 0 0.25rem', color: '#94a3b8', fontWeight: 500, fontSize: '1rem' }}>
+                Review Score Distribution
+              </h4>
+              <ReviewDistributionChart />
+            </>
+          )}
 
-        {dbTab === 'price' && (
-          <>
-            <h4 style={{ margin: '0 0 0.25rem', color: '#94a3b8', fontWeight: 500, fontSize: '1rem' }}>
-              Price vs. Review Score
-            </h4>
-            <PriceVsReviewsChart />
-          </>
-        )}
+          {dbTab === 'price' && (
+            <>
+              <h4 style={{ margin: '0 0 0.25rem', color: '#94a3b8', fontWeight: 500, fontSize: '1rem' }}>
+                Price Distribution
+              </h4>
+              <PriceDistributionChart />
+            </>
+          )}
 
-        {dbTab === 'publisher' && (
-          <>
-            <h4 style={{ margin: '0 0 0.25rem', color: '#94a3b8', fontWeight: 500, fontSize: '1rem' }}>
-              Indie / AA / AAA Publisher Tiers
-            </h4>
-            <PublisherTierChart />
-          </>
-        )}
+          {dbTab === 'publisher' && (
+            <>
+              <h4 style={{ margin: '0 0 0.25rem', color: '#94a3b8', fontWeight: 500, fontSize: '1rem' }}>
+                Indie / AA / AAA Publisher Tiers
+              </h4>
+              <PublisherTierChart />
+            </>
+          )}
 
-        {dbTab === 'top-owned' && (
-          <>
-            <h4 style={{ margin: '0 0 0.25rem', color: '#94a3b8', fontWeight: 500, fontSize: '1rem' }}>
-              Most Owned Games on Steam
-            </h4>
-            <TopOwnedGamesChart userGames={games} />
-          </>
-        )}
+          {dbTab === 'top-owned' && (
+            <>
+              <h4 style={{ margin: '0 0 0.25rem', color: '#94a3b8', fontWeight: 500, fontSize: '1rem' }}>
+                Most Owned Games on Steam
+              </h4>
+              <TopOwnedGamesChart userGames={games} />
+            </>
+          )}
+
+          {dbTab === 'peak-ccu' && (
+            <>
+              <h4 style={{ margin: '0 0 0.25rem', color: '#94a3b8', fontWeight: 500, fontSize: '1rem' }}>
+                All-Time Peak CCU (Concurrent Players)
+              </h4>
+              <PeakCCUChart userGames={games} />
+            </>
+          )}
+
+          {dbTab === 'releases' && (
+            <>
+              <h4 style={{ margin: '0 0 0.25rem', color: '#94a3b8', fontWeight: 500, fontSize: '1rem' }}>
+                Games Released by Year
+              </h4>
+              <ReleaseYearChart />
+            </>
+          )}
+
+          {dbTab === 'features' && (
+            <>
+              <h4 style={{ margin: '0 0 0.25rem', color: '#94a3b8', fontWeight: 500, fontSize: '1rem' }}>
+                Game Features Proportions
+              </h4>
+              <GameFeaturesChart />
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

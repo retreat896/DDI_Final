@@ -3,39 +3,39 @@ import * as d3 from 'd3';
 import axios from 'axios';
 
 /**
- * Horizontal chart: Top 15 games by estimated ownership (DB).
- * Only highlights owned games when userGames has actual entries.
+ * Horizontal chart: Highest Peak CCU games.
  */
-function TopOwnedGamesChart({ userGames }) {
+function PeakCCUChart({ userGames }) {
   const chartRef = useRef();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [dbGames, setDbGames] = useState([]);
   const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:5000';
 
-  // True only when a logged-in user's library has been loaded
   const hasLibrary = Array.isArray(userGames) && userGames.length > 0;
   const userAppIds = hasLibrary ? new Set(userGames.map(g => String(g.appid))) : new Set();
 
   useEffect(() => {
-    axios.get(`${API_BASE}/api/analytics/top-owned?limit=25`)
+    axios.get(`${API_BASE}/api/analytics/peak-ccu?limit=25`)
       .then(res => {
         setDbGames(res.data);
       })
-      .catch(e => setError(e.response?.data?.error || 'Failed to load top owned games.'))
+      .catch(e => setError(e.response?.data?.error || 'Failed to load peak CCU games.'))
       .finally(() => setLoading(false));
   }, []);
 
-  // Re-draw whenever db data arrives or user library changes
   useEffect(() => {
-    if (dbGames.length > 0) draw(dbGames);
-  }, [dbGames, userGames]);  // eslint-disable-line react-hooks/exhaustive-deps
+    let cleanup;
+    if (dbGames.length > 0) {
+      cleanup = draw(dbGames);
+    }
+    return () => { if (cleanup) cleanup(); };
+  }, [dbGames, userGames]);
 
   function draw(data) {
     if (!data || data.length === 0) return;
     d3.select(chartRef.current).selectAll('*').remove();
 
-    // Right margin: wider when legend is shown, tighter when not
     const margin = { top: 10, right: hasLibrary ? 170 : 20, bottom: 50, left: 160 };
     const width = 760 - margin.left - margin.right;
     const height = Math.max(data.length * 34, 200);
@@ -52,15 +52,15 @@ function TopOwnedGamesChart({ userGames }) {
       .range([0, height])
       .padding(0.22);
 
-    const minOwners = d3.min(data, d => Math.max(+(d.owners_midpoint || 1), 1));
-    const maxOwners = d3.max(data, d => +(d.owners_midpoint || 1));
+    const minCCU = d3.min(data, d => Math.max(+(d.peak_ccu || 1), 1));
+    const maxCCU = d3.max(data, d => +(d.peak_ccu || 1));
 
     const x = d3.scaleLog()
-      .domain([Math.max(minOwners * 0.5, 1), maxOwners * 1.15])
+      .domain([Math.max(minCCU * 0.5, 1), maxCCU * 1.15])
       .range([0, width])
       .nice();
 
-    // Y-axis labels — gold + bold only when library comparison is active
+    // Y-axis
     svg.append('g')
       .call(d3.axisLeft(y))
       .selectAll('text')
@@ -76,7 +76,7 @@ function TopOwnedGamesChart({ userGames }) {
         return userAppIds.has(String(game?.appid)) ? '700' : '400';
       });
 
-    // Vertical grid lines (log-friendly)
+    // Vertical grid lines
     svg.append('g')
       .attr('class', 'grid')
       .attr('transform', `translate(0,${height})`)
@@ -89,7 +89,7 @@ function TopOwnedGamesChart({ userGames }) {
     svg.append('g')
       .attr('transform', `translate(0,${height})`)
       .call(d3.axisBottom(x).ticks(5).tickFormat(d => {
-        if (d >= 1_000_000) return `${(d / 1_000_000).toFixed(0)}M`;
+        if (d >= 1_000_000) return `${(d / 1_000_000).toFixed(1)}M`;
         if (d >= 1_000) return `${(d / 1_000).toFixed(0)}k`;
         return d;
       }))
@@ -101,11 +101,11 @@ function TopOwnedGamesChart({ userGames }) {
       .attr('x', width / 2).attr('y', height + 42)
       .attr('text-anchor', 'middle')
       .style('fill', '#64748b').style('font-size', '12px')
-      .text('Estimated Owners');
+      .text('Peak Concurrent Players (Log Scale)');
 
-    const tooltipSelection = d3.select('body').select('.d3-topowned-tooltip');
+    const tooltipSelection = d3.select('body').select('.d3-peakccu-tooltip');
     const tooltip = tooltipSelection.empty()
-      ? d3.select('body').append('div').attr('class', 'd3-tooltip d3-topowned-tooltip').style('opacity', 0)
+      ? d3.select('body').append('div').attr('class', 'd3-tooltip d3-peakccu-tooltip').style('opacity', 0)
       : tooltipSelection;
 
     svg.selectAll('rect')
@@ -115,17 +115,11 @@ function TopOwnedGamesChart({ userGames }) {
       .attr('x', d => x(x.domain()[0]))
       .attr('height', y.bandwidth())
       .attr('width', 0)
-      // Only colour gold when library comparison is active
-      .attr('fill', d => hasLibrary && userAppIds.has(String(d.appid)) ? '#fbbf24' : '#3b82f6')
+      .attr('fill', d => hasLibrary && userAppIds.has(String(d.appid)) ? '#fbbf24' : '#14b8a6')
       .attr('rx', 4)
       .attr('opacity', d => hasLibrary && userAppIds.has(String(d.appid)) ? 0.95 : 0.75)
       .on('mouseover', function (event, d) {
         d3.select(this).attr('opacity', 1);
-        const pos = +(d.positive_reviews || 0);
-        const neg = +(d.negative_reviews || 0);
-        const total = pos + neg;
-        const pct = total > 0 ? ((pos / total) * 100).toFixed(1) : '?';
-        // Only show ownership hint when library is loaded
         const ownedLine = hasLibrary && userAppIds.has(String(d.appid))
           ? '<br/>✅ <strong>You own this</strong>'
           : '';
@@ -133,8 +127,7 @@ function TopOwnedGamesChart({ userGames }) {
         tooltip.html(
           `<strong>${d.name}</strong><br/>` +
           `Genre: ${d.genre_primary || '—'}<br/>` +
-          `Owners: ~${(+(d.owners_midpoint || 0)).toLocaleString()}<br/>` +
-          `Reviews: ${pct}% positive` +
+          `Peak CCU: ${(+(d.peak_ccu || 0)).toLocaleString()}` +
           ownedLine
         )
           .style('left', (event.pageX + 12) + 'px')
@@ -146,15 +139,14 @@ function TopOwnedGamesChart({ userGames }) {
       })
       .transition().duration(600).delay((d, i) => i * 40)
       .attr('x', x(x.domain()[0]))
-      .attr('width', d => Math.max(0, x(+(d.owners_midpoint || 1)) - x(x.domain()[0])));
+      .attr('width', d => Math.max(0, x(+(d.peak_ccu || 1)) - x(x.domain()[0])));
 
-    // Legend — only render when library comparison is active
     if (hasLibrary) {
       const leg = d3.select(chartRef.current).select('svg')
         .append('g')
         .attr('transform', `translate(${margin.left + width + 12}, ${margin.top + 10})`);
 
-      [{ color: '#fbbf24', label: 'You own this' }, { color: '#3b82f6', label: 'Not in library' }].forEach(({ color, label }, i) => {
+      [{ color: '#fbbf24', label: 'You own this' }, { color: '#14b8a6', label: 'Not in library' }].forEach(({ color, label }, i) => {
         const g = leg.append('g').attr('transform', `translate(0, ${i * 22})`);
         g.append('rect').attr('width', 14).attr('height', 14).attr('rx', 3).attr('fill', color);
         g.append('text').attr('x', 19).attr('y', 11)
@@ -170,7 +162,7 @@ function TopOwnedGamesChart({ userGames }) {
   return (
     <div>
       <p style={{ color: '#64748b', fontSize: '0.8rem', marginTop: 0, marginBottom: '0.75rem' }}>
-        Most-owned games across the entire Steam dataset.{' '}
+        The all-time highest concurrent player peaks recorded on Steam.{' '}
         {hasLibrary
           ? <span style={{ color: '#fbbf24' }}>Gold bars = games already in your library.</span>
           : <span>Sign in to highlight games you already own.</span>}
@@ -180,4 +172,4 @@ function TopOwnedGamesChart({ userGames }) {
   );
 }
 
-export default TopOwnedGamesChart;
+export default PeakCCUChart;
