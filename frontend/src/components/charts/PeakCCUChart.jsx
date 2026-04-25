@@ -24,13 +24,31 @@ function PeakCCUChart({ userGames }) {
       .finally(() => setLoading(false));
   }, []);
 
+  // Full redraw only when DB data changes
   useEffect(() => {
-    let cleanup;
-    if (dbGames.length > 0) {
-      cleanup = draw(dbGames);
-    }
-    return () => { if (cleanup) cleanup(); };
-  }, [dbGames, userGames]);
+    if (dbGames.length > 0) draw(dbGames);
+  }, [dbGames]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Lightweight color update when user library changes (no full redraw)
+  useEffect(() => {
+    if (!chartRef.current || dbGames.length === 0) return;
+    const ownedIds = Array.isArray(userGames) ? new Set(userGames.map(g => String(g.appid))) : new Set();
+    const owned = ownedIds.size > 0;
+    d3.select(chartRef.current).selectAll('rect')
+      .attr('fill', d => owned && ownedIds.has(String(d?.appid)) ? '#fbbf24' : '#14b8a6')
+      .attr('opacity', d => owned && ownedIds.has(String(d?.appid)) ? 0.95 : 0.75);
+    d3.select(chartRef.current).selectAll('.tick text')
+      .style('fill', d => {
+        if (!owned) return '#cbd5e1';
+        const game = dbGames.find(g => g.name === d);
+        return ownedIds.has(String(game?.appid)) ? '#fbbf24' : '#cbd5e1';
+      })
+      .style('font-weight', d => {
+        if (!owned) return '400';
+        const game = dbGames.find(g => g.name === d);
+        return ownedIds.has(String(game?.appid)) ? '700' : '400';
+      });
+  }, [userGames, dbGames]);
 
   function draw(data) {
     if (!data || data.length === 0) return;
@@ -154,7 +172,7 @@ function PeakCCUChart({ userGames }) {
       });
     }
 
-    return () => { d3.selectAll('.d3-tooltip').remove(); };
+    return () => { d3.select('body').select('.d3-peakccu-tooltip').style('opacity', 0); };
   }
 
   if (loading) return <div className="skeleton-graph"></div>;

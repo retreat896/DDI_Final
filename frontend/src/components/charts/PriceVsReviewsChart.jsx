@@ -117,7 +117,7 @@ function PriceVsReviewsChart() {
         tooltip.transition().duration(300).style('opacity', 0);
       });
 
-    return () => { d3.selectAll('.d3-tooltip').remove(); };
+    return () => { d3.select('body').select('.d3-pvr-tooltip').style('opacity', 0); };
   }
 
   if (loading) return <p style={{ color: '#64748b' }}>Loading price vs reviews data from database…</p>;

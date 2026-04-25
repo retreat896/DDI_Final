@@ -114,7 +114,7 @@ function LibraryBreakdownChart({ games }) {
       .style('font-size', '11px')
       .text(d => d.count > 0 ? d.count : '');
 
-    return () => { d3.selectAll('.d3-tooltip').remove(); };
+    return () => { d3.select('body').select('.d3-library-tooltip').style('opacity', 0); };
   }, [games]);
 
   return (

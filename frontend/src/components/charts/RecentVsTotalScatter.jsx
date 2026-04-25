@@ -118,7 +118,7 @@ function RecentVsTotalScatter({ games }) {
         });
     });
 
-    return () => { d3.selectAll('.d3-tooltip').remove(); };
+    return () => { d3.select('body').select('.d3-scatter-tooltip').style('opacity', 0); };
   }, [games]);
 
   return (

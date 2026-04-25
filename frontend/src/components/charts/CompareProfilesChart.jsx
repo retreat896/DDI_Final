@@ -158,7 +158,7 @@ function CompareProfilesChart({ myGames, myName }) {
         .text(label.length > 10 ? label.slice(0, 9) + '…' : label);
     });
 
-    return () => { d3.selectAll('.d3-tooltip').remove(); };
+    return () => { d3.select('body').select('.d3-compare-tooltip').style('opacity', 0); };
   }, [myGames, theirGames, myName, theirName]);
 
   return (

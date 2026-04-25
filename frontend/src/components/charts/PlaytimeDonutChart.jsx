@@ -23,9 +23,9 @@ function PlaytimeDonutChart({ games }) {
 
     d3.select(chartRef.current).selectAll('*').remove();
 
-    const width = 480;
-    const height = 320;
-    const radius = Math.min(width, height) / 2 - 20;
+    const width = 620;
+    const height = 340;
+    const radius = Math.min(width * 0.42, height / 2) - 16;
     const innerRadius = radius * 0.55;
 
     const svg = d3.select(chartRef.current)
@@ -33,7 +33,7 @@ function PlaytimeDonutChart({ games }) {
       .attr('width', width)
       .attr('height', height)
       .append('g')
-      .attr('transform', `translate(${width / 2.6}, ${height / 2})`);
+      .attr('transform', `translate(${Math.round(width * 0.32)}, ${height / 2})`);
 
     const color = d3.scaleOrdinal()
       .domain(data.map(d => d.name))
@@ -89,24 +89,25 @@ function PlaytimeDonutChart({ games }) {
       .style('font-weight', '700')
       .text(`${totalHours.toFixed(0)}h`);
 
-    // Legend
+    // Legend — fixed to the right third of the SVG, clear of all arcs
+    const legendX = Math.round(width * 0.32) + radius + 24;
     const legend = d3.select(chartRef.current).select('svg')
       .append('g')
-      .attr('transform', `translate(${width * 0.56}, ${height / 2 - (data.length * 18) / 2})`);
+      .attr('transform', `translate(${legendX}, ${height / 2 - (data.length * 20) / 2})`);
 
     data.forEach((d, i) => {
-      const g = legend.append('g').attr('transform', `translate(0, ${i * 20})`);
-      g.append('rect').attr('width', 12).attr('height', 12).attr('rx', 3)
+      const g = legend.append('g').attr('transform', `translate(0, ${i * 22})`);
+      g.append('rect').attr('width', 13).attr('height', 13).attr('rx', 3)
         .attr('fill', color(d.name));
       g.append('text')
-        .attr('x', 18).attr('y', 10)
+        .attr('x', 20).attr('y', 10.5)
         .style('fill', '#cbd5e1')
-        .style('font-size', '11px')
-        .text(d.name.length > 18 ? d.name.slice(0, 17) + '…' : d.name);
+        .style('font-size', '11.5px')
+        .text(d.name.length > 20 ? d.name.slice(0, 19) + '…' : d.name);
     });
 
     return () => {
-      d3.selectAll('.d3-tooltip').remove();
+      d3.select('body').select('.d3-donut-tooltip').style('opacity', 0);
     };
   }, [games]);
 

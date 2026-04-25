@@ -120,7 +120,7 @@ function PlaytimeBarChart({ games, onGameClick }) {
       .attr('stop-color', '#8b5cf6');
 
     return () => {
-      d3.selectAll('.d3-tooltip').remove();
+      d3.select('body').select('.d3-playtime-tooltip').style('opacity', 0);
     };
   }, [games]);
 

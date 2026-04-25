@@ -26,10 +26,20 @@ function TopOwnedGamesChart({ userGames }) {
       .finally(() => setLoading(false));
   }, []);
 
-  // Re-draw whenever db data arrives or user library changes
+  // Full redraw only when DB data arrives
   useEffect(() => {
     if (dbGames.length > 0) draw(dbGames);
-  }, [dbGames, userGames]);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [dbGames]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Lightweight color update when user library changes (no full redraw)
+  useEffect(() => {
+    if (!chartRef.current || dbGames.length === 0) return;
+    const ownedIds = Array.isArray(userGames) ? new Set(userGames.map(g => String(g.appid))) : new Set();
+    const owned = ownedIds.size > 0;
+    d3.select(chartRef.current).selectAll('rect')
+      .attr('fill', d => owned && ownedIds.has(String(d?.appid)) ? '#fbbf24' : '#6366f1')
+      .attr('opacity', d => owned && ownedIds.has(String(d?.appid)) ? 0.95 : 0.75);
+  }, [userGames, dbGames]);
 
   function draw(data) {
     if (!data || data.length === 0) return;
@@ -162,7 +172,7 @@ function TopOwnedGamesChart({ userGames }) {
       });
     }
 
-    return () => { d3.selectAll('.d3-tooltip').remove(); };
+    return () => { d3.select('body').select('.d3-topowned-tooltip').style('opacity', 0); };
   }
 
   if (loading) return <div className="skeleton-graph"></div>;

@@ -149,7 +149,7 @@ function GameFeaturesChart() {
       .style('opacity', 1)
       .attr('x', d => x((d.count / total) * 100) + 8);
 
-    return () => { d3.selectAll('.d3-tooltip').remove(); };
+    return () => { d3.select('body').select('.d3-features-tooltip').style('opacity', 0); };
   }
 
   if (loading) return <div className="skeleton-graph" style={{ height: '380px' }}></div>;

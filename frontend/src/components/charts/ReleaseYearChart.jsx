@@ -146,7 +146,7 @@ function ReleaseYearChart() {
       .transition().duration(800).delay((d, i) => i * 50)
       .attr("opacity", 1);
 
-    return () => { d3.selectAll('.d3-tooltip').remove(); };
+    return () => { d3.select('body').select('.d3-release-tooltip').style('opacity', 0); };
   }
 
   if (loading) return <div className="skeleton-graph" style={{ height: '300px' }}></div>;

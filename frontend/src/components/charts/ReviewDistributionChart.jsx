@@ -106,7 +106,7 @@ function ReviewDistributionChart() {
       .attr('y', d => y(+d.count))
       .attr('height', d => height - y(+d.count));
 
-    return () => { d3.selectAll('.d3-tooltip').remove(); };
+    return () => { d3.select('body').select('.d3-review-tooltip').style('opacity', 0); };
   }
 
   if (loading) return <div className="skeleton-graph"></div>;

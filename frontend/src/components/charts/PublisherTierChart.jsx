@@ -136,7 +136,7 @@ function PublisherTierChart() {
         .style('fill', '#94a3b8').style('font-size', '11px').text(label);
     });
 
-    return () => { d3.selectAll('.d3-tooltip').remove(); };
+    return () => { d3.select('body').select('.d3-publisher-tooltip').style('opacity', 0); };
   }
 
   if (loading) return <div className="skeleton-graph"></div>;

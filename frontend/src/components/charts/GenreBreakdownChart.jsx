@@ -94,7 +94,7 @@ function GenreBreakdownChart() {
       .style('font-size', '11px')
       .text(d => (+d.count).toLocaleString());
 
-    return () => { d3.selectAll('.d3-tooltip').remove(); };
+    return () => { d3.select('body').select('.d3-genre-tooltip').style('opacity', 0); };
   }
 
   if (loading) return <div className="skeleton-graph"></div>;
