@@ -44,7 +44,7 @@ function StatsCards({ games }) {
   ];
 
   return (
-    <div style={{
+    <div className="stats-grid" style={{
       display: 'grid',
       gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
       gap: '1rem',

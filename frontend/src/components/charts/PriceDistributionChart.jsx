@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import * as d3 from 'd3';
 import axios from 'axios';
+import { positionTooltip } from '../../utils/tooltip.js';
 
 const BUCKET_ORDER = [
   'Free',
@@ -160,9 +161,10 @@ function PriceDistributionChart() {
         d3.select(this).attr('r',7).attr('fill','#60a5fa');
         tip.style('opacity',1)
           .html(`<strong>${d.bucket}</strong><br/>${(+d.count).toLocaleString()} games`);
+        positionTooltip(tip, event);
       })
       .on('mousemove', function(event) {
-        tip.style('left',(event.pageX+12)+'px').style('top',(event.pageY-28)+'px');
+        positionTooltip(tip, event);
       })
       .on('mouseout', function() {
         d3.select(this).attr('r',5).attr('fill','#0f172a');
@@ -281,13 +283,13 @@ function PriceDistributionChart() {
       </div>
 
       {/* Main zoomed chart */}
-      <div ref={mainRef} style={{ width:'100%' }} />
+      <div className="chart-scroll" ref={mainRef} style={{ width:'100%' }} />
 
       {/* Context / overview with brush */}
       <p style={{ color:'#475569', fontSize:'0.72rem', margin:'4px 0 2px 72px' }}>
         Overview — drag to select range
       </p>
-      <div ref={contextRef} style={{ width:'100%' }} />
+      <div className="chart-scroll" ref={contextRef} style={{ width:'100%' }} />
     </div>
   );
 }

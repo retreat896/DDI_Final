@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import axios from 'axios';
+import { positionTooltip } from '../../utils/tooltip.js';
 
 /**
  * Side-by-side grouped bar chart comparing top 10 games of two Steam profiles.
@@ -137,14 +138,13 @@ function CompareProfilesChart({ myGames, myName }) {
         .on('mouseover', function (event, d) {
           d3.select(this).attr('opacity', 0.75);
           const who = key === 'me' ? myName || 'You' : theirName;
-          tooltip.transition().duration(200).style('opacity', 1);
+          tooltip.style('opacity', 1);
           tooltip.html(`<strong>${d.name}</strong><br/>${who}: ${d[key].toFixed(1)}h`)
-            .style('left', (event.pageX + 10) + 'px')
-            .style('top', (event.pageY - 28) + 'px');
+            positionTooltip(tooltip, event);
         })
         .on('mouseout', function () {
           d3.select(this).attr('opacity', 1);
-          tooltip.transition().duration(300).style('opacity', 0);
+          tooltip.style('opacity', 0);
         });
     });
 
@@ -206,7 +206,7 @@ function CompareProfilesChart({ myGames, myName }) {
           Enter a Steam profile above to begin comparison
         </div>
       )}
-      <div ref={chartRef} style={{ overflowX: 'auto', display: 'flex', justifyContent: 'center' }} />
+      <div className="chart-scroll" ref={chartRef} style={{ overflowX: 'auto', display: 'flex', justifyContent: 'center' }} />
     </div>
   );
 }

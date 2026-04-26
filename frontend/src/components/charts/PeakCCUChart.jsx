@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import axios from 'axios';
+import { positionTooltip } from '../../utils/tooltip.js';
 
 /**
  * Horizontal chart: Highest Peak CCU games.
@@ -141,19 +142,18 @@ function PeakCCUChart({ userGames }) {
         const ownedLine = hasLibrary && userAppIds.has(String(d.appid))
           ? '<br/>✅ <strong>You own this</strong>'
           : '';
-        tooltip.transition().duration(150).style('opacity', 1);
+        tooltip.style('opacity', 1);
         tooltip.html(
           `<strong>${d.name}</strong><br/>` +
           `Genre: ${d.genre_primary || '—'}<br/>` +
           `Peak CCU: ${(+(d.peak_ccu || 0)).toLocaleString()}` +
           ownedLine
         )
-          .style('left', (event.pageX + 12) + 'px')
-          .style('top', (event.pageY - 28) + 'px');
+          positionTooltip(tooltip, event);
       })
       .on('mouseout', function (event, d) {
         d3.select(this).attr('opacity', hasLibrary && userAppIds.has(String(d.appid)) ? 0.95 : 0.75);
-        tooltip.transition().duration(300).style('opacity', 0);
+        tooltip.style('opacity', 0);
       })
       .transition().duration(600).delay((d, i) => i * 40)
       .attr('x', x(x.domain()[0]))
@@ -185,7 +185,7 @@ function PeakCCUChart({ userGames }) {
           ? <span style={{ color: '#fbbf24' }}>Gold bars = games already in your library.</span>
           : <span>Sign in to highlight games you already own.</span>}
       </p>
-      <div ref={chartRef} style={{ overflowX: 'auto', display: 'flex', justifyContent: 'center' }} />
+      <div className="chart-scroll" ref={chartRef} style={{ overflowX: 'auto', display: 'flex', justifyContent: 'center' }} />
     </div>
   );
 }

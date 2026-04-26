@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import axios from 'axios';
+import { positionTooltip } from '../../utils/tooltip.js';
 
 /**
  * Grouped bar chart: for each publisher tier (Indie / AA / AAA),
@@ -100,19 +101,18 @@ function PublisherTierChart() {
           .attr('rx', 4)
           .on('mouseover', function (event) {
             d3.select(this).attr('opacity', 0.75);
-            tooltip.transition().duration(150).style('opacity', 1);
+            tooltip.style('opacity', 1);
             const val = m === 'avg_owners_k'
               ? `${d[m].toLocaleString()}k`
               : m === 'avg_positive_pct'
               ? `${d[m]}%`
               : d[m].toLocaleString();
             tooltip.html(`<strong>${d.tier}</strong> – ${labelMap[m]}<br/>${val}`)
-              .style('left', (event.pageX + 10) + 'px')
-              .style('top', (event.pageY - 28) + 'px');
+              positionTooltip(tooltip, event);
           })
           .on('mouseout', function () {
             d3.select(this).attr('opacity', 1);
-            tooltip.transition().duration(300).style('opacity', 0);
+            tooltip.style('opacity', 0);
           });
 
         // Value label
@@ -146,7 +146,7 @@ function PublisherTierChart() {
       <p style={{ color: '#64748b', fontSize: '0.8rem', marginTop: 0, marginBottom: '0.75rem' }}>
         Indie vs. AA vs. AAA comparison: number of titles, average review score, and average estimated ownership.
       </p>
-      <div ref={chartRef} style={{ overflowX: 'auto', display: 'flex', justifyContent: 'center' }} />
+      <div className="chart-scroll" ref={chartRef} style={{ overflowX: 'auto', display: 'flex', justifyContent: 'center' }} />
     </div>
   );
 }

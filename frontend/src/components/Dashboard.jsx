@@ -44,34 +44,12 @@ const DB_TABS = [
 // ─── Sub-component: tab bar ──────────────────────────────────────────────────
 function TabBar({ tabs, active, onSelect }) {
   return (
-    <div style={{
-      display: 'flex',
-      gap: '0.45rem',
-      marginBottom: '1.1rem',
-      overflowX: 'auto',
-      paddingBottom: '4px',
-      flexWrap: 'wrap',
-    }}>
+    <div className="tab-bar">
       {tabs.map(tab => (
         <button
           key={tab.id}
+          className={`tab-btn${active === tab.id ? ' active' : ''}`}
           onClick={() => onSelect(tab.id)}
-          style={{
-            padding: '0.45rem 1rem',
-            borderRadius: '999px',
-            border: active === tab.id
-              ? '1px solid rgba(59,130,246,0.6)'
-              : '1px solid rgba(255,255,255,0.1)',
-            background: active === tab.id
-              ? 'linear-gradient(90deg,rgba(59,130,246,0.25),rgba(139,92,246,0.25))'
-              : 'rgba(30,41,59,0.5)',
-            color: active === tab.id ? '#f8fafc' : '#94a3b8',
-            fontWeight: active === tab.id ? 600 : 400,
-            fontSize: '0.82rem',
-            cursor: 'pointer',
-            whiteSpace: 'nowrap',
-            transition: 'all 0.2s ease',
-          }}
         >
           {tab.label}
         </button>

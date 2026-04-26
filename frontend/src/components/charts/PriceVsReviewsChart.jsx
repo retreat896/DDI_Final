@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import axios from 'axios';
+import { positionTooltip } from '../../utils/tooltip.js';
 
 /** Scatter: game price (x) vs review score % (y), bubble sized by ownership. */
 function PriceVsReviewsChart() {
@@ -102,19 +103,18 @@ function PriceVsReviewsChart() {
       .style('cursor', 'pointer')
       .on('mouseover', function (event, d) {
         d3.select(this).attr('fill-opacity', 1).attr('stroke', '#fff');
-        tooltip.transition().duration(150).style('opacity', 1);
+        tooltip.style('opacity', 1);
         tooltip.html(
           `<strong>${d.name}</strong><br/>` +
           `Price: $${(+d.price).toFixed(2)}<br/>` +
           `Reviews: ${d.review_pct}% positive<br/>` +
           `Total: ${(+d.total_reviews).toLocaleString()}`
         )
-          .style('left', (event.pageX + 12) + 'px')
-          .style('top', (event.pageY - 28) + 'px');
+          positionTooltip(tooltip, event);
       })
       .on('mouseout', function () {
         d3.select(this).attr('fill-opacity', 0.65).attr('stroke', 'rgba(255,255,255,0.12)');
-        tooltip.transition().duration(300).style('opacity', 0);
+        tooltip.style('opacity', 0);
       });
 
     return () => { d3.select('body').select('.d3-pvr-tooltip').style('opacity', 0); };
@@ -127,7 +127,7 @@ function PriceVsReviewsChart() {
       <p style={{ color: '#64748b', fontSize: '0.8rem', marginTop: 0, marginBottom: '0.75rem' }}>
         500 randomly sampled games. Bubble size = total review volume. Color: red → green by score. Capped at $70.
       </p>
-      <div ref={chartRef} style={{ overflowX: 'auto', display: 'flex', justifyContent: 'center' }} />
+      <div className="chart-scroll" ref={chartRef} style={{ overflowX: 'auto', display: 'flex', justifyContent: 'center' }} />
     </div>
   );
 }

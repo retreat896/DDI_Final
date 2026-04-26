@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import axios from 'axios';
+import { positionTooltip } from '../../utils/tooltip.js';
 
 /** Horizontal bar chart of top genres by game count from the DB. */
 function GenreBreakdownChart() {
@@ -71,14 +72,13 @@ function GenreBreakdownChart() {
       .attr('rx', 4)
       .on('mouseover', function (event, d) {
         d3.select(this).attr('opacity', 0.8);
-        tooltip.transition().duration(150).style('opacity', 1);
+        tooltip.style('opacity', 1);
         tooltip.html(`<strong>${d.genre}</strong><br/>${(+d.count).toLocaleString()} games`)
-          .style('left', (event.pageX + 10) + 'px')
-          .style('top', (event.pageY - 28) + 'px');
+          positionTooltip(tooltip, event);
       })
       .on('mouseout', function () {
         d3.select(this).attr('opacity', 1);
-        tooltip.transition().duration(300).style('opacity', 0);
+        tooltip.style('opacity', 0);
       })
       .transition().duration(600).delay((d, i) => i * 30)
       .attr('width', d => x(+d.count));
@@ -104,7 +104,7 @@ function GenreBreakdownChart() {
       <p style={{ color: '#64748b', fontSize: '0.8rem', marginTop: 0, marginBottom: '0.75rem' }}>
         Game count per primary genre across all titles in the dataset.
       </p>
-      <div ref={chartRef} style={{ overflowX: 'auto', display: 'flex', justifyContent: 'center' }} />
+      <div className="chart-scroll" ref={chartRef} style={{ overflowX: 'auto', display: 'flex', justifyContent: 'center' }} />
     </div>
   );
 }

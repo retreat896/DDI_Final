@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import axios from 'axios';
+import { positionTooltip } from '../../utils/tooltip.js';
 
 /**
  * Bar chart showing proportions of Free, Early Access, and Controller Supported games.
@@ -120,15 +121,14 @@ function GameFeaturesChart() {
       .attr('rx', 6)
       .on('mouseover', function (event, d) {
         d3.select(this).attr('opacity', 0.85);
-        tooltip.transition().duration(150).style('opacity', 1);
+        tooltip.style('opacity', 1);
         const pct = ((d.count / total) * 100).toFixed(1);
         tooltip.html(`<strong>${d.label}</strong><br/>${d.count.toLocaleString()} games (${pct}%)`)
-          .style('left', (event.pageX + 10) + 'px')
-          .style('top', (event.pageY - 28) + 'px');
+          positionTooltip(tooltip, event);
       })
       .on('mouseout', function () {
         d3.select(this).attr('opacity', 1);
-        tooltip.transition().duration(300).style('opacity', 0);
+        tooltip.style('opacity', 0);
       })
       .transition().duration(800).delay((d, i) => i * 100)
       .attr('width', d => x((d.count / total) * 100));
@@ -160,7 +160,7 @@ function GameFeaturesChart() {
       <p style={{ color: '#64748b', fontSize: '0.8rem', marginTop: 0, marginBottom: '0.75rem' }}>
         Percentage of all Steam games with each feature — sorted by prevalence.
       </p>
-      <div ref={chartRef} style={{ overflowX: 'auto', display: 'flex', justifyContent: 'center' }} />
+      <div className="chart-scroll" ref={chartRef} style={{ overflowX: 'auto', display: 'flex', justifyContent: 'center' }} />
     </div>
   );
 }

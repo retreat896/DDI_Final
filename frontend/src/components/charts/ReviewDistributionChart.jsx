@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import axios from 'axios';
+import { positionTooltip } from '../../utils/tooltip.js';
 
 /** Histogram of overall review score distribution (0–100%) from steam_games DB table. */
 function ReviewDistributionChart() {
@@ -93,14 +94,13 @@ function ReviewDistributionChart() {
       .attr('opacity', 0.88)
       .on('mouseover', function (event, d) {
         d3.select(this).attr('opacity', 1).attr('stroke', '#fff').attr('stroke-width', 1);
-        tooltip.transition().duration(150).style('opacity', 1);
+        tooltip.style('opacity', 1);
         tooltip.html(`<strong>${d.bucket}–${+d.bucket + 5}%</strong><br/>${(+d.count).toLocaleString()} games`)
-          .style('left', (event.pageX + 10) + 'px')
-          .style('top', (event.pageY - 28) + 'px');
+          positionTooltip(tooltip, event);
       })
       .on('mouseout', function () {
         d3.select(this).attr('opacity', 0.88).attr('stroke', 'none');
-        tooltip.transition().duration(300).style('opacity', 0);
+        tooltip.style('opacity', 0);
       })
       .transition().duration(700).delay((d, i) => i * 20)
       .attr('y', d => y(+d.count))
@@ -116,7 +116,7 @@ function ReviewDistributionChart() {
       <p style={{ color: '#64748b', fontSize: '0.8rem', marginTop: 0, marginBottom: '0.75rem' }}>
         Distribution of all Steam games by their overall positive review percentage. Color goes red → green with score.
       </p>
-      <div ref={chartRef} style={{ overflowX: 'auto', display: 'flex', justifyContent: 'center' }} />
+      <div className="chart-scroll" ref={chartRef} style={{ overflowX: 'auto', display: 'flex', justifyContent: 'center' }} />
     </div>
   );
 }
