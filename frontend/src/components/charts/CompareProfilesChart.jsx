@@ -14,6 +14,7 @@ function CompareProfilesChart({ myGames, myName }) {
   const [error, setError] = useState('');
   const [theirGames, setTheirGames] = useState(null);
   const [theirName, setTheirName] = useState('');
+  const [comparisonStats, setComparisonStats] = useState(null);
 
   const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:5000';
 
@@ -42,7 +43,27 @@ function CompareProfilesChart({ myGames, myName }) {
   };
 
   useEffect(() => {
-    if (!myGames || myGames.length === 0 || !theirGames || theirGames.length === 0) return;
+    if (!myGames || myGames.length === 0 || !theirGames || theirGames.length === 0) {
+      setComparisonStats(null);
+      return;
+    }
+
+    // Calculate comparison stats
+    const myStats = {
+      totalPlaytime: myGames.reduce((sum, g) => sum + (g.playtime_forever || 0), 0) / 60, // hours
+      recentPlaytime: myGames.reduce((sum, g) => sum + (g.playtime_2weeks || 0), 0) / 60, // hours
+      totalGames: myGames.length,
+      avgTimePerGame: myGames.length > 0 ? myGames.reduce((sum, g) => sum + (g.playtime_forever || 0), 0) / myGames.length / 60 : 0 // hours
+    };
+
+    const theirStats = {
+      totalPlaytime: theirGames.reduce((sum, g) => sum + (g.playtime_forever || 0), 0) / 60,
+      recentPlaytime: theirGames.reduce((sum, g) => sum + (g.playtime_2weeks || 0), 0) / 60,
+      totalGames: theirGames.length,
+      avgTimePerGame: theirGames.length > 0 ? theirGames.reduce((sum, g) => sum + (g.playtime_forever || 0), 0) / theirGames.length / 60 : 0
+    };
+
+    setComparisonStats({ myStats, theirStats });
 
     // Build a union of top 10 games from each player
     const myTop = myGames
@@ -177,7 +198,7 @@ function CompareProfilesChart({ myGames, myName }) {
   }, [myGames, theirGames, myName, theirName]);
 
   return (
-    <div ref={wrapRef} style={{ width: '100%' }}>
+    <div ref={wrapRef} style={{ width: '100%', maxHeight: '80vh', overflowY: 'auto' }}>
       <div>
       <p style={{ color: '#64748b', fontSize: '0.8rem', marginTop: 0, marginBottom: '1rem' }}>
         Look up another Steam profile to compare your top games side-by-side.
@@ -222,7 +243,118 @@ function CompareProfilesChart({ myGames, myName }) {
           Enter a Steam profile above to begin comparison
         </div>
       )}
-      <div className="chart-scroll" ref={chartRef} style={{ overflowX: 'auto', display: 'flex', justifyContent: 'center' }} />
+      <div className="chart-scroll" ref={chartRef} style={{ overflowX: 'auto', display: 'flex', justifyContent: 'center', marginBottom: '2rem' }} />
+
+      {theirGames && myGames && (
+        <div style={{ marginTop: '2rem' }}>
+          <h4 style={{ color: '#f8fafc', marginBottom: '1.5rem', fontSize: '1.1rem' }}>Overall Statistics Comparison</h4>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
+            {/* Total Playtime */}
+            <div style={{
+              background: 'rgba(30, 41, 59, 0.7)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '12px',
+              padding: '1.5rem',
+              backdropFilter: 'blur(12px)'
+            }}>
+              <h5 style={{ color: '#94a3b8', margin: '0 0 1rem 0', fontSize: '0.9rem', fontWeight: 500 }}>Total Playtime</h5>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ color: '#3b82f6', fontSize: '1.5rem', fontWeight: 'bold' }}>
+                    {(() => {
+                      const myTotal = myGames.reduce((sum, g) => sum + (g.playtime_forever || 0), 0) / 60;
+                      const theirTotal = theirGames.reduce((sum, g) => sum + (g.playtime_forever || 0), 0) / 60;
+                      return myTotal.toFixed(0);
+                    })()}h
+                  </div>
+                  <div style={{ color: '#64748b', fontSize: '0.8rem' }}>{myName || 'You'}</div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ color: '#f59e0b', fontSize: '1.5rem', fontWeight: 'bold' }}>
+                    {comparisonStats.myStats.totalPlaytime.toFixed(0)}h
+                  </div>
+                  <div style={{ color: '#64748b', fontSize: '0.8rem' }}>{theirName}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Recent Playtime */}
+            <div style={{
+              background: 'rgba(30, 41, 59, 0.7)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '12px',
+              padding: '1.5rem',
+              backdropFilter: 'blur(12px)'
+            }}>
+              <h5 style={{ color: '#94a3b8', margin: '0 0 1rem 0', fontSize: '0.9rem', fontWeight: 500 }}>Recent Playtime (2 weeks)</h5>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ color: '#3b82f6', fontSize: '1.5rem', fontWeight: 'bold' }}>
+                    {comparisonStats.myStats.recentPlaytime.toFixed(1)}h
+                  </div>
+                  <div style={{ color: '#64748b', fontSize: '0.8rem' }}>{myName || 'You'}</div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ color: '#f59e0b', fontSize: '1.5rem', fontWeight: 'bold' }}>
+                    {comparisonStats.theirStats.totalPlaytime.toFixed(0)}h
+                  </div>
+                  <div style={{ color: '#64748b', fontSize: '0.8rem' }}>{theirName}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Total Games Owned */}
+            <div style={{
+              background: 'rgba(30, 41, 59, 0.7)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '12px',
+              padding: '1.5rem',
+              backdropFilter: 'blur(12px)'
+            }}>
+              <h5 style={{ color: '#94a3b8', margin: '0 0 1rem 0', fontSize: '0.9rem', fontWeight: 500 }}>Games Owned</h5>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ color: '#3b82f6', fontSize: '1.5rem', fontWeight: 'bold' }}>
+                    {comparisonStats.myStats.totalGames}
+                  </div>
+                  <div style={{ color: '#64748b', fontSize: '0.8rem' }}>{myName || 'You'}</div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ color: '#f59e0b', fontSize: '1.5rem', fontWeight: 'bold' }}>
+                    {comparisonStats.theirStats.totalGames}
+                  </div>
+                  <div style={{ color: '#64748b', fontSize: '0.8rem' }}>{theirName}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Average Time Per Game */}
+            <div style={{
+              background: 'rgba(30, 41, 59, 0.7)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '12px',
+              padding: '1.5rem',
+              backdropFilter: 'blur(12px)'
+            }}>
+              <h5 style={{ color: '#94a3b8', margin: '0 0 1rem 0', fontSize: '0.9rem', fontWeight: 500 }}>Avg. Time Per Game</h5>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ color: '#3b82f6', fontSize: '1.5rem', fontWeight: 'bold' }}>
+                    {comparisonStats.myStats.avgTimePerGame.toFixed(1)}h
+                  </div>
+                  <div style={{ color: '#64748b', fontSize: '0.8rem' }}>{myName || 'You'}</div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ color: '#f59e0b', fontSize: '1.5rem', fontWeight: 'bold' }}>
+                    {comparisonStats.theirStats.avgTimePerGame.toFixed(1)}h
+                  </div>
+                  <div style={{ color: '#64748b', fontSize: '0.8rem' }}>{theirName}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       </div>
     </div>
   );

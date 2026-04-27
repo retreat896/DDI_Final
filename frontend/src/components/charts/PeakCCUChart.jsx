@@ -177,7 +177,14 @@ function PeakCCUChart({ userGames }) {
         .append('g')
         .attr('transform', `translate(${margin.left + width + 12}, ${margin.top + 10})`);
 
-      [{ color: '#fbbf24', label: 'You own this' }, { color: '#14b8a6', label: 'Not in library' }].forEach(({ color, label }, i) => {
+      const legendItems = [];
+      const hasOwned = data.some(d => userAppIds.has(String(d.appid)));
+      const hasNotOwned = data.some(d => !userAppIds.has(String(d.appid)));
+
+      if (hasOwned) legendItems.push({ color: '#fbbf24', label: 'You own this' });
+      if (hasNotOwned) legendItems.push({ color: '#14b8a6', label: 'Not in library' });
+
+      legendItems.forEach(({ color, label }, i) => {
         const g = leg.append('g').attr('transform', `translate(0, ${i * 22})`);
         g.append('rect').attr('width', 14).attr('height', 14).attr('rx', 3).attr('fill', color);
         g.append('text').attr('x', 19).attr('y', 11)
