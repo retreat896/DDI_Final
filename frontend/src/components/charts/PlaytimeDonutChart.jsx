@@ -33,7 +33,11 @@ function PlaytimeDonutChart({ games }) {
     const radius     = donutSize / 2 - 16;
     const innerRadius = radius * 0.55;
 
-    const svgW = isMobile ? donutSize : donutSize + 200;
+    // Calculate legend width needed
+    const legendTextMaxLength = isMobile ? 0 : d3.max(data, d => d.name.length);
+    const legendWidth = isMobile ? 0 : Math.max(200, legendTextMaxLength * 7 + 20); // rough estimate 7px per char
+
+    const svgW = isMobile ? donutSize : donutSize + legendWidth;
     const svgH = donutSize;
 
     const svg = d3.select(chartRef.current)
@@ -91,7 +95,7 @@ function PlaytimeDonutChart({ games }) {
         g.append('rect').attr('width',13).attr('height',13).attr('rx',3).attr('fill', color(d.name));
         g.append('text').attr('x',19).attr('y',10.5)
           .style('fill','#cbd5e1').style('font-size','11.5px')
-          .text(d.name.length > 20 ? d.name.slice(0,19) + '…' : d.name);
+          .text(d.name);
       });
     }
 

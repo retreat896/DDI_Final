@@ -56,7 +56,18 @@ function PeakCCUChart({ userGames }) {
     if (!data || data.length === 0) return;
     d3.select(chartRef.current).selectAll('*').remove();
 
-    const margin = { top: 10, right: hasLibrary ? 170 : 20, bottom: 50, left: 160 };
+    // Calculate dynamic left margin based on longest game name
+    const tempSvg = d3.select(chartRef.current).append('svg').attr('width', 0).attr('height', 0);
+    const tempText = tempSvg.append('text').style('font-size', '11.5px').style('font-weight', '400');
+    const maxNameWidth = d3.max(data, d => {
+      tempText.text(d.name);
+      return tempText.node().getComputedTextLength();
+    });
+    tempSvg.remove();
+
+    const dynamicLeftMargin = Math.max(160, maxNameWidth + 20); // minimum 160, add 20px padding
+
+    const margin = { top: 10, right: hasLibrary ? 170 : 20, bottom: 50, left: dynamicLeftMargin };
     const containerW = wrapRef.current?.getBoundingClientRect().width || 760;
     const width = Math.max(containerW - margin.left - margin.right, 320);
     const height = Math.max(data.length * 34, 200);

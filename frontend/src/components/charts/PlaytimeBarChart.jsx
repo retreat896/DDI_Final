@@ -23,7 +23,20 @@ function PlaytimeBarChart({ games, onGameClick }) {
     const containerW = wrapRef.current?.getBoundingClientRect().width || 600;
     const isMobile   = containerW < 520;
 
-    const margin = { top: 20, right: 20, bottom: isMobile ? 90 : 110, left: isMobile ? 42 : 56 };
+    // Calculate dynamic bottom margin based on longest game name when rotated
+    const tempSvg = d3.select(chartRef.current).append('svg').attr('width', 0).attr('height', 0);
+    const tempText = tempSvg.append('text').style('font-size', isMobile ? '9px' : '11px');
+    const maxNameWidth = d3.max(data, d => {
+      tempText.text(d.name);
+      return tempText.node().getComputedTextLength();
+    });
+    tempSvg.remove();
+
+    // Approximate height needed for rotated text (rotated -40 degrees, so height is width * sin(40) + some padding)
+    const rotatedHeight = maxNameWidth * Math.sin(40 * Math.PI / 180) + 20;
+    const dynamicBottomMargin = Math.max(isMobile ? 90 : 110, rotatedHeight);
+
+    const margin = { top: 20, right: 20, bottom: dynamicBottomMargin, left: isMobile ? 42 : 56 };
     const width  = Math.max(containerW - margin.left - margin.right, 320);
     const height = (isMobile ? 260 : 340) - margin.top - margin.bottom;
 

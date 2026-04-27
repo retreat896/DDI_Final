@@ -71,7 +71,20 @@ function CompareProfilesChart({ myGames, myName }) {
 
     d3.select(chartRef.current).selectAll('*').remove();
 
-    const margin = { top: 20, right: 20, bottom: 130, left: 65 };
+    // Calculate dynamic bottom margin based on longest game name when rotated
+    const tempSvg = d3.select(chartRef.current).append('svg').attr('width', 0).attr('height', 0);
+    const tempText = tempSvg.append('text').style('font-size', '11px');
+    const maxNameWidth = d3.max(data, d => {
+      tempText.text(d.name);
+      return tempText.node().getComputedTextLength();
+    });
+    tempSvg.remove();
+
+    // Approximate height needed for rotated text (rotated -40 degrees, so height is width * sin(40) + some padding)
+    const rotatedHeight = maxNameWidth * Math.sin(40 * Math.PI / 180) + 30; // add more padding for translation
+    const dynamicBottomMargin = Math.max(130, rotatedHeight);
+
+    const margin = { top: 20, right: 20, bottom: dynamicBottomMargin, left: 65 };
     const containerW = wrapRef.current?.getBoundingClientRect().width || 820;
     const width = Math.max(containerW - margin.left - margin.right, 320);
     const height = 360 - margin.top - margin.bottom;
