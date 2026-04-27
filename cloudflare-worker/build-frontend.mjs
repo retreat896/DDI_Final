@@ -23,7 +23,7 @@ const OUT_DIR      = path.resolve(__dirname, 'dist');
 const WATCH        = process.argv.includes('--watch');
 
 if (!fs.existsSync(FRONTEND_DIR)) {
-  console.error(`❌ Frontend directory not found: ${FRONTEND_DIR}`);
+  console.error(`Frontend directory not found: ${FRONTEND_DIR}`);
   process.exit(1);
 }
 
@@ -43,7 +43,7 @@ const args = [
   ...(WATCH ? ['--watch'] : []),
 ];
 
-console.log(`🏗️  Building frontend → ${OUT_DIR}`);
+console.log(`Building frontend → ${OUT_DIR}`);
 if (WATCH) console.log('   (watch mode — rebuilds on file changes)\n');
 
 if (WATCH) {
@@ -57,5 +57,5 @@ if (WATCH) {
   child.on('close', (code) => process.exit(code ?? 0));
 } else {
   execSync(`npx ${args.join(' ')}`, { cwd: FRONTEND_DIR, env, stdio: 'inherit' });
-  console.log('\n✅ Frontend built successfully.');
+  console.log('\nFrontend built successfully.');
 }

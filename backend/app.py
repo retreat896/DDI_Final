@@ -8,7 +8,7 @@ from flask import Flask, redirect, request, jsonify
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
 from dotenv import load_dotenv
-from db import get_db_connection
+from db import get_db_connection, DB_SCHEMA
 from flasgger import Swagger
 import threading
 
@@ -39,6 +39,19 @@ swagger = Swagger(app, config={
 STEAM_API_KEY = os.getenv("STEAM_API_KEY", "")
 FRONTEND_URL = "http://localhost:5173"
 STEAM_OPENID_URL = "https://steamcommunity.com/openid/login"
+
+@app.route('/api/config')
+def api_config():
+    """
+    Returns public server capability flags.
+    ---
+    responses:
+      200:
+        description: Feature flags for the frontend.
+    """
+    return jsonify({
+        "steam_api_enabled": bool(STEAM_API_KEY),
+    })
 
 @app.route('/api/auth/steam')
 def login():
@@ -215,7 +228,7 @@ def get_games(steamid):
     if not STEAM_API_KEY:
         return jsonify({"error": "Steam API key not configured"}), 500
         
-    url = f"http://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key={STEAM_API_KEY}&steamid={steamid}&format=json&include_appinfo=1"
+    url = f"http://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key={STEAM_API_KEY}&steamid={steamid}&format=json&include_appinfo=1&include_played_free_games=1"
     r = requests.get(url)
     if r.status_code == 200:
         return jsonify(r.json())
@@ -235,9 +248,9 @@ def analytics_genres():
     try:
         conn = get_db_connection()
         with conn.cursor(row_factory=dict_row) as cur:
-            cur.execute("""
+            cur.execute(f"""
                 SELECT genre_primary AS genre, COUNT(*) AS count
-                FROM game_analytics
+                FROM "{DB_SCHEMA}"."game_analytics"
                 WHERE genre_primary IS NOT NULL AND genre_primary <> ''
                 GROUP BY genre_primary
                 ORDER BY count DESC;
@@ -264,11 +277,11 @@ def analytics_review_distribution():
     try:
         conn = get_db_connection()
         with conn.cursor(row_factory=dict_row) as cur:
-            cur.execute("""
+            cur.execute(f"""
                 SELECT
                     (FLOOR(CAST(NULLIF(overall_review__, '') AS NUMERIC) / 5) * 5)::INT AS bucket,
                     COUNT(*) AS count
-                FROM steam_games
+                FROM "{DB_SCHEMA}"."steam_games"
                 WHERE overall_review__ IS NOT NULL AND overall_review__ <> ''
                 GROUP BY bucket
                 ORDER BY bucket;
@@ -295,7 +308,7 @@ def analytics_price_distribution():
     try:
         conn = get_db_connection()
         with conn.cursor(row_factory=dict_row) as cur:
-            cur.execute("""
+            cur.execute(f"""
                 SELECT
                     CASE
                         WHEN CAST(NULLIF(price_final,'') AS NUMERIC) =   0 THEN 'Free'
@@ -330,7 +343,7 @@ def analytics_price_distribution():
                         ELSE '$100+'
                     END AS bucket,
                     COUNT(*) AS count
-                FROM game_analytics
+                FROM "{DB_SCHEMA}"."game_analytics"
                 WHERE price_final IS NOT NULL AND price_final <> ''
                 GROUP BY bucket
                 ORDER BY MIN(CAST(NULLIF(price_final,'') AS NUMERIC));
@@ -357,7 +370,7 @@ def analytics_publisher_tiers():
     try:
         conn = get_db_connection()
         with conn.cursor(row_factory=dict_row) as cur:
-            cur.execute("""
+            cur.execute(f"""
                 SELECT
                     publisher_tier AS tier,
                     COUNT(*) AS game_count,
@@ -369,7 +382,7 @@ def analytics_publisher_tiers():
                         END
                     ), 1) AS avg_positive_pct,
                     ROUND(AVG(CAST(NULLIF(owners_midpoint,'') AS NUMERIC))) AS avg_owners
-                FROM game_analytics
+                FROM "{DB_SCHEMA}"."game_analytics"
                 WHERE publisher_tier IS NOT NULL AND publisher_tier <> ''
                 GROUP BY publisher_tier
                 ORDER BY
@@ -408,7 +421,7 @@ def analytics_top_owned():
         limit = min(int(request.args.get('limit', 20)), 50)
         conn = get_db_connection()
         with conn.cursor(row_factory=dict_row) as cur:
-            cur.execute("""
+            cur.execute(f"""
                 SELECT
                     appid,
                     name,
@@ -416,11 +429,11 @@ def analytics_top_owned():
                     genre_primary,
                     CAST(NULLIF(positive_reviews,'') AS INT) AS positive_reviews,
                     CAST(NULLIF(negative_reviews,'') AS INT) AS negative_reviews
-                FROM game_analytics
+                FROM "{DB_SCHEMA}"."game_analytics"
                 WHERE owners_midpoint IS NOT NULL AND owners_midpoint <> '0' AND owners_midpoint <> ''
                 ORDER BY CAST(NULLIF(owners_midpoint,'') AS BIGINT) DESC
-                LIMIT %s;
-            """, (limit,))
+                LIMIT {limit};
+            """)
             rows = cur.fetchall()
         conn.close()
         return jsonify(rows)
@@ -434,11 +447,11 @@ def analytics_releases_by_year():
     try:
         conn = get_db_connection()
         with conn.cursor(row_factory=dict_row) as cur:
-            cur.execute("""
+            cur.execute(f"""
                 SELECT 
                     SUBSTRING(release_date, 1, 4) AS year, 
                     COUNT(*) AS count 
-                FROM game_analytics 
+                FROM "{DB_SCHEMA}"."game_analytics" 
                 WHERE release_date IS NOT NULL 
                   AND release_date <> '' 
                   AND CAST(SUBSTRING(release_date, 1, 4) AS INTEGER) BETWEEN 2000 AND 2025
@@ -459,17 +472,17 @@ def analytics_peak_ccu():
         limit = min(int(request.args.get('limit', 25)), 100)
         conn = get_db_connection()
         with conn.cursor(row_factory=dict_row) as cur:
-            cur.execute("""
+            cur.execute(f"""
                 SELECT 
                     appid,
                     name, 
                     CAST(NULLIF(peak_ccu, '') AS BIGINT) AS peak_ccu,
                     genre_primary
-                FROM game_analytics 
+                FROM "{DB_SCHEMA}"."game_analytics" 
                 WHERE peak_ccu IS NOT NULL AND peak_ccu <> '0' AND peak_ccu <> ''
                 ORDER BY CAST(NULLIF(peak_ccu, '') AS BIGINT) DESC 
-                LIMIT %s;
-            """, (limit,))
+                LIMIT {limit};
+            """)
             rows = cur.fetchall()
         conn.close()
         return jsonify(rows)
@@ -483,7 +496,7 @@ def analytics_game_features():
     try:
         conn = get_db_connection()
         with conn.cursor(row_factory=dict_row) as cur:
-            cur.execute("""
+            cur.execute(f"""
                 SELECT 
                     SUM(CASE WHEN LOWER(is_free) = 'true' THEN 1 ELSE 0 END) AS free_games, 
                     SUM(CASE WHEN LOWER(is_early_access) = 'true' THEN 1 ELSE 0 END) AS early_access_games, 
@@ -493,7 +506,7 @@ def analytics_game_features():
                     SUM(CASE WHEN CAST(NULLIF(languages_count,'') AS INTEGER) >= 10 THEN 1 ELSE 0 END) AS multilingual,
                     SUM(CASE WHEN CAST(NULLIF(required_age,'') AS INTEGER) > 0 THEN 1 ELSE 0 END) AS age_restricted,
                     COUNT(*) AS total_games 
-                FROM game_analytics;
+                FROM "{DB_SCHEMA}"."game_analytics";
             """)
             rows = cur.fetchall()
         conn.close()

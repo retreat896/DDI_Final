@@ -122,7 +122,7 @@ async function generateSql(csvFile, tableName) {
   const csvPath = path.join(DATASETS, csvFile);
   const sqlPath = path.join(TMP_DIR, `d1_remote_${tableName}.sql`);
 
-  console.log(`  📝 Generating SQL file for ${tableName}…`);
+  console.log(`  Generating SQL file for ${tableName}…`);
   const gen = parseCSV(csvPath);
 
   // Read headers
@@ -165,23 +165,23 @@ async function generateSql(csvFile, tableName) {
 
   await new Promise((res, rej) => ws.end(err => err ? rej(err) : res()));
   const sizeMB = (fs.statSync(sqlPath).size / 1024 / 1024).toFixed(1);
-  console.log(`\n    ✅ ${rowCount.toLocaleString()} rows → ${sqlPath} (${sizeMB} MB)`);
+  console.log(`\n    ${rowCount.toLocaleString()} rows → ${sqlPath} (${sizeMB} MB)`);
   return { sqlPath, rowCount };
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 const t0 = Date.now();
-console.log('🚀 D1 Remote Seeder — Steam Dataset Importer');
+console.log('D1 Remote Seeder — Steam Dataset Importer');
 console.log('=============================================');
-console.log('  Target  : 🌐 REMOTE Cloudflare D1');
+console.log('  Target  : REMOTE Cloudflare D1');
 console.log('  Method  : generate SQL file → wrangler d1 execute --remote --file\n');
 
 for (const { csv, table } of TARGETS) {
-  console.log(`\n📦 ${csv} → ${table}`);
+  console.log(`\n${csv} → ${table}`);
 
   // ── Idempotency check ──────────────────────────────────────────────────
-  process.stdout.write('  🔍 Checking remote row count… ');
+  process.stdout.write('  Checking remote row count… ');
   const existing = remoteRowCount(table);
   if (existing > 0) {
     console.log(`already has ${existing.toLocaleString()} rows — skipping.`);
@@ -191,7 +191,7 @@ for (const { csv, table } of TARGETS) {
 
   const csvPath = path.join(DATASETS, csv);
   if (!fs.existsSync(csvPath)) {
-    console.log(`  ⚠️  ${csv} not found — skipping.`);
+    console.log(`  ${csv} not found — skipping.`);
     continue;
   }
 
@@ -200,10 +200,10 @@ for (const { csv, table } of TARGETS) {
     const t1 = Date.now();
     const { sqlPath, rowCount } = await generateSql(csv, table);
     const genSec = ((Date.now() - t1) / 1000).toFixed(1);
-    console.log(`  ⏱️  SQL generated in ${genSec}s`);
+    console.log(`  SQL generated in ${genSec}s`);
 
     // ── Step 2: Execute against remote D1 ───────────────────────────────
-    console.log(`  ⬆️  Uploading to remote D1 (this may take a few minutes)…`);
+    console.log(`  Uploading to remote D1 (this may take a few minutes)…`);
     const t2 = Date.now();
 
     execSync(
@@ -217,19 +217,19 @@ for (const { csv, table } of TARGETS) {
     );
 
     const uploadSec = ((Date.now() - t2) / 1000).toFixed(1);
-    console.log(`  ✅ ${table}: ${rowCount.toLocaleString()} rows uploaded in ${uploadSec}s`);
+    console.log(`  ${table}: ${rowCount.toLocaleString()} rows uploaded in ${uploadSec}s`);
 
     // Clean up temp SQL file
     fs.unlinkSync(sqlPath);
 
   } catch (e) {
-    console.error(`\n  ❌ Error seeding ${table}:`, e.message);
+    console.error(`\n  Error seeding ${table}:`, e.message);
     process.exit(1);
   }
 }
 
 // ── Indices ─────────────────────────────────────────────────────────────────
-console.log('\n📌 Building remote indices…');
+console.log('\nBuilding remote indices…');
 const indices = [
   `CREATE INDEX IF NOT EXISTS idx_ga_appid  ON game_analytics(appid);`,
   `CREATE INDEX IF NOT EXISTS idx_ga_genre  ON game_analytics(genre_primary);`,
@@ -245,8 +245,8 @@ for (const stmt of indices) {
     process.stdout.write('.');
   } catch { /* already exists */ }
 }
-console.log(' ✅');
+console.log(' Done');
 
 const totalSec = ((Date.now() - t0) / 1000).toFixed(1);
-console.log(`\n🎉 Remote seed complete in ${totalSec}s.`);
+console.log(`\nRemote seed complete in ${totalSec}s.`);
 console.log('   Run `npm run deploy` to push the worker.');

@@ -15,7 +15,7 @@ function StatsCards({ games }) {
       label: 'Games Owned',
       value: totalGames.toLocaleString(),
       sub: `${playedGames.length} played`,
-      icon: '🎮',
+      icon: '',
       color: '#3b82f6',
     },
     {
@@ -24,21 +24,21 @@ function StatsCards({ games }) {
         ? `${(totalHours / 1000).toFixed(1)}k`
         : totalHours.toFixed(0),
       sub: `${(totalHours / 24).toFixed(0)} days`,
-      icon: '⏱️',
+      icon: '',
       color: '#8b5cf6',
     },
     {
       label: 'Active Recently',
       value: recentGames,
       sub: 'last 2 weeks',
-      icon: '🔥',
+      icon: '',
       color: '#f59e0b',
     },
     {
       label: 'Avg per Game',
       value: `${avgHours.toFixed(1)}h`,
       sub: 'hours per played game',
-      icon: '📊',
+      icon: '',
       color: '#10b981',
     },
   ];

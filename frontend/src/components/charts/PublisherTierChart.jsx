@@ -9,6 +9,7 @@ import { positionTooltip } from '../../utils/tooltip.js';
  */
 function PublisherTierChart() {
   const chartRef = useRef();
+  const wrapRef  = useRef();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [data, setData] = useState([]);
@@ -30,7 +31,8 @@ function PublisherTierChart() {
     d3.select(chartRef.current).selectAll('*').remove();
 
     const margin = { top: 30, right: 30, bottom: 50, left: 70 };
-    const width = 620 - margin.left - margin.right;
+    const containerW = wrapRef.current?.getBoundingClientRect().width || 620;
+    const width = Math.max(containerW - margin.left - margin.right, 320);
     const height = 320 - margin.top - margin.bottom;
 
     const svg = d3.select(chartRef.current)
@@ -142,11 +144,13 @@ function PublisherTierChart() {
   if (loading) return <div className="skeleton-graph"></div>;
   if (error) return <p style={{ color: '#ef4444' }}>{error}</p>;
   return (
-    <div>
+    <div ref={wrapRef} style={{ width: '100%' }}>
+      <div>
       <p style={{ color: '#64748b', fontSize: '0.8rem', marginTop: 0, marginBottom: '0.75rem' }}>
         Indie vs. AA vs. AAA comparison: number of titles, average review score, and average estimated ownership.
       </p>
       <div className="chart-scroll" ref={chartRef} style={{ overflowX: 'auto', display: 'flex', justifyContent: 'center' }} />
+      </div>
     </div>
   );
 }

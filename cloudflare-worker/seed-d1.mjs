@@ -113,7 +113,7 @@ async function generateSql(csvFile, tableName) {
   const csvPath = path.join(DATASETS, csvFile);
   const sqlPath = path.join(TMP_DIR, `d1_local_${tableName}.sql`);
 
-  console.log(`  📝 Generating SQL file for ${tableName}…`);
+  console.log(`  Generating SQL file for ${tableName}…`);
   const gen = parseCSV(csvPath);
 
   // Read headers
@@ -157,23 +157,23 @@ async function generateSql(csvFile, tableName) {
 
   await new Promise((res, rej) => ws.end(err => err ? rej(err) : res()));
   const sizeMB = (fs.statSync(sqlPath).size / 1024 / 1024).toFixed(1);
-  console.log(`\n    ✅ ${rowCount.toLocaleString()} rows → ${sizeMB} MB SQL file`);
+  console.log(`\n    ${rowCount.toLocaleString()} rows → ${sizeMB} MB SQL file`);
   return { sqlPath, rowCount };
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 const t0 = Date.now();
-console.log('🚀 D1 Local Seeder — Steam Dataset Importer');
+console.log('D1 Local Seeder — Steam Dataset Importer');
 console.log('============================================');
-console.log('  Target  : 💻 LOCAL (.wrangler/state)');
+console.log('  Target  : LOCAL (.wrangler/state)');
 console.log('  Method  : generate SQL file → wrangler d1 execute --local --file\n');
 
 for (const { csv, table } of TARGETS) {
-  console.log(`\n📦 ${csv} → ${table}`);
+  console.log(`\n${csv} → ${table}`);
 
   // Idempotency check
-  process.stdout.write('  🔍 Checking local row count… ');
+  process.stdout.write('  Checking local row count… ');
   const existing = localRowCount(table);
   if (existing > 0) {
     console.log(`already has ${existing.toLocaleString()} rows — skipping.`);
@@ -183,7 +183,7 @@ for (const { csv, table } of TARGETS) {
 
   const csvPath = path.join(DATASETS, csv);
   if (!fs.existsSync(csvPath)) {
-    console.log(`  ⚠️  ${csv} not found — skipping.`);
+    console.log(`  ${csv} not found — skipping.`);
     continue;
   }
 
@@ -192,10 +192,10 @@ for (const { csv, table } of TARGETS) {
     const t1 = Date.now();
     const { sqlPath, rowCount } = await generateSql(csv, table);
     const genSec = ((Date.now() - t1) / 1000).toFixed(1);
-    console.log(`  ⏱️  SQL generated in ${genSec}s`);
+    console.log(`  SQL generated in ${genSec}s`);
 
     // Step 2: Execute against local D1
-    console.log(`  ⬆️  Executing against local D1…`);
+    console.log(`  Executing against local D1…`);
     const t2 = Date.now();
 
     execSync(
@@ -209,18 +209,18 @@ for (const { csv, table } of TARGETS) {
     );
 
     const execSec = ((Date.now() - t2) / 1000).toFixed(1);
-    console.log(`  ✅ ${table}: ${rowCount.toLocaleString()} rows in ${execSec}s`);
+    console.log(`  ${table}: ${rowCount.toLocaleString()} rows in ${execSec}s`);
 
     fs.unlinkSync(sqlPath);
 
   } catch (e) {
-    console.error(`\n  ❌ Error seeding ${table}:`, e.message);
+    console.error(`\n  Error seeding ${table}:`, e.message);
     process.exit(1);
   }
 }
 
 // Indices
-console.log('\n📌 Building local indices…');
+console.log('\nBuilding local indices…');
 const indices = [
   `CREATE INDEX IF NOT EXISTS idx_ga_appid  ON game_analytics(appid);`,
   `CREATE INDEX IF NOT EXISTS idx_ga_genre  ON game_analytics(genre_primary);`,
@@ -236,8 +236,8 @@ for (const stmt of indices) {
     process.stdout.write('.');
   } catch { /* already exists */ }
 }
-console.log(' ✅');
+console.log(' Done');
 
 const totalSec = ((Date.now() - t0) / 1000).toFixed(1);
-console.log(`\n🎉 Local seed complete in ${totalSec}s.`);
+console.log(`\nLocal seed complete in ${totalSec}s.`);
 console.log('   Run `npm run dev` to start wrangler with the frontend.');

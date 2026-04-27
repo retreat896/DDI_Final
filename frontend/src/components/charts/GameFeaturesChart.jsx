@@ -8,6 +8,7 @@ import { positionTooltip } from '../../utils/tooltip.js';
  */
 function GameFeaturesChart() {
   const chartRef = useRef();
+  const wrapRef  = useRef();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [data, setData] = useState(null);
@@ -47,7 +48,8 @@ function GameFeaturesChart() {
     const total = rawData.total_games;
 
     const margin = { top: 20, right: 60, bottom: 40, left: 165 };
-    const width = 680 - margin.left - margin.right;
+    const containerW = wrapRef.current?.getBoundingClientRect().width || 680;
+    const width = Math.max(containerW - margin.left - margin.right, 320);
     const height = 340 - margin.top - margin.bottom;
 
     const svg = d3.select(chartRef.current)
@@ -156,11 +158,13 @@ function GameFeaturesChart() {
   if (error) return <p style={{ color: '#ef4444' }}>{error}</p>;
 
   return (
-    <div>
+    <div ref={wrapRef} style={{ width: '100%' }}>
+      <div>
       <p style={{ color: '#64748b', fontSize: '0.8rem', marginTop: 0, marginBottom: '0.75rem' }}>
         Percentage of all Steam games with each feature — sorted by prevalence.
       </p>
       <div className="chart-scroll" ref={chartRef} style={{ overflowX: 'auto', display: 'flex', justifyContent: 'center' }} />
+      </div>
     </div>
   );
 }

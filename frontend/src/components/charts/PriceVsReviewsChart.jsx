@@ -6,6 +6,7 @@ import { positionTooltip } from '../../utils/tooltip.js';
 /** Scatter: game price (x) vs review score % (y), bubble sized by ownership. */
 function PriceVsReviewsChart() {
   const chartRef = useRef();
+  const wrapRef  = useRef();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [data, setData] = useState([]);
@@ -27,7 +28,8 @@ function PriceVsReviewsChart() {
     d3.select(chartRef.current).selectAll('*').remove();
 
     const margin = { top: 20, right: 30, bottom: 60, left: 65 };
-    const width = 720 - margin.left - margin.right;
+    const containerW = wrapRef.current?.getBoundingClientRect().width || 720;
+    const width = Math.max(containerW - margin.left - margin.right, 320);
     const height = 360 - margin.top - margin.bottom;
 
     const svg = d3.select(chartRef.current)
@@ -123,11 +125,13 @@ function PriceVsReviewsChart() {
   if (loading) return <p style={{ color: '#64748b' }}>Loading price vs reviews data from database…</p>;
   if (error) return <p style={{ color: '#ef4444' }}>{error}</p>;
   return (
-    <div>
+    <div ref={wrapRef} style={{ width: '100%' }}>
+      <div>
       <p style={{ color: '#64748b', fontSize: '0.8rem', marginTop: 0, marginBottom: '0.75rem' }}>
         500 randomly sampled games. Bubble size = total review volume. Color: red → green by score. Capped at $70.
       </p>
       <div className="chart-scroll" ref={chartRef} style={{ overflowX: 'auto', display: 'flex', justifyContent: 'center' }} />
+      </div>
     </div>
   );
 }

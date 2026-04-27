@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { useServerConfig } from '../hooks/useServerConfig';
 
 // --- Personal (Steam API) charts ---
 import PlaytimeBarChart from './charts/PlaytimeBarChart';
@@ -23,22 +24,22 @@ import StatsCards from './StatsCards';
 
 // ─── Tab definitions ────────────────────────────────────────────────────────
 const PERSONAL_TABS = [
-  { id: 'overview',  label: '📊 Top Played' },
-  { id: 'donut',     label: '🍩 Playtime Share' },
-  { id: 'scatter',   label: '🔥 Recent Activity' },
-  { id: 'library',   label: '📚 Library Breakdown' },
-  { id: 'compare',   label: '⚔️ Compare Profiles' },
+  { id: 'overview',  label: 'Top Played' },
+  { id: 'donut',     label: 'Playtime Share' },
+  { id: 'scatter',   label: 'Recent Activity' },
+  { id: 'library',   label: 'Library Breakdown' },
+  { id: 'compare',   label: 'Compare Profiles' },
 ];
 
 const DB_TABS = [
-  { id: 'genres',     label: '🎮 Genres' },
-  { id: 'reviews',    label: '⭐ Review Scores' },
-  { id: 'price',      label: '💰 Price Distribution' },
-  { id: 'publisher',  label: '🏢 Publisher Tiers' },
-  { id: 'top-owned',  label: '🌍 Most Owned' },
-  { id: 'peak-ccu',   label: '🔥 Peak Players' },
-  { id: 'releases',   label: '📈 Game Releases' },
-  { id: 'features',   label: '✨ Features Overview' },
+  { id: 'genres',     label: 'Genres' },
+  { id: 'reviews',    label: 'Review Scores' },
+  { id: 'price',      label: 'Price Distribution' },
+  { id: 'publisher',  label: 'Publisher Tiers' },
+  { id: 'top-owned',  label: 'Most Owned' },
+  { id: 'peak-ccu',   label: 'Peak Players' },
+  { id: 'releases',   label: 'Game Releases' },
+  { id: 'features',   label: 'Features Overview' },
 ];
 
 // ─── Sub-component: tab bar ──────────────────────────────────────────────────
@@ -79,6 +80,8 @@ function Dashboard() {
   const [isGuest, setIsGuest] = useState(false);
   const navigate = useNavigate();
   const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:5000';
+  const { steamApiEnabled } = useServerConfig();
+
 
   useEffect(() => {
     const steamid = localStorage.getItem('steamid');
@@ -135,7 +138,6 @@ function Dashboard() {
 
   if (loading) return (
     <div className="glass-panel" style={{ textAlign: 'center', padding: '4rem' }}>
-      <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>⚙️</div>
       <p style={{ color: '#94a3b8' }}>Analyzing your gaming footprint…</p>
     </div>
   );
@@ -157,7 +159,6 @@ function Dashboard() {
           gap: '1rem',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <span style={{ fontSize: '2rem' }}>👤</span>
             <div>
               <h2 style={{ margin: 0, marginBottom: '0.2rem' }}>Browsing as Guest</h2>
               <p style={{ margin: 0, color: '#64748b', fontSize: '0.82rem' }}>
@@ -214,9 +215,10 @@ function Dashboard() {
       {/* ══════════════════════════════════════════════════════════════════════
           SECTION 1 — PERSONAL LIBRARY (Steam API)
       ══════════════════════════════════════════════════════════════════════ */}
+      {steamApiEnabled ? (
       <div className="glass-panel" style={{ marginBottom: '1.5rem' }}>
         <SectionHeader
-          title="🎯 Your Library"
+          title="Your Library"
           subtitle="Visualizations built from your personal Steam profile data."
         />
 
@@ -244,7 +246,6 @@ function Dashboard() {
               }}
             />
             <div style={{ position: 'relative', zIndex: 1 }}>
-              <div style={{ fontSize: '3rem', marginBottom: '1rem', marginTop: '-2rem' }}>🔒</div>
               <h3 style={{ marginBottom: '0.5rem', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>Personal Library Analytics</h3>
               <p style={{ color: '#94a3b8', maxWidth: '380px', margin: '0 auto 1.5rem', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
                 Sign in with your Steam account (or paste a profile URL) to see your top played games,
@@ -313,13 +314,32 @@ function Dashboard() {
           </>
         )}
       </div>
+      ) : (
+        /* ── No Steam API key: show a brief notice instead of the whole section ── */
+        <div className="glass-panel" style={{ marginBottom: '1.5rem' }}>
+          <SectionHeader title="Your Library" subtitle="Personal library analytics require a Steam API key." />
+          <div style={{
+            background: 'rgba(245,158,11,0.08)',
+            border: '1px solid rgba(245,158,11,0.3)',
+            borderRadius: '10px',
+            padding: '1.25rem 1.5rem',
+            color: '#fbbf24',
+            fontSize: '0.88rem',
+            lineHeight: 1.6,
+          }}>
+            ⚠️ <strong>Steam API key not configured.</strong> Personal library features (Top Played, Playtime
+            Share, Recent Activity, Library Breakdown, Compare Profiles) are disabled. Add a{' '}
+            <code>STEAM_API_KEY</code> to the server environment to enable them.
+          </div>
+        </div>
+      )}
 
       {/* ══════════════════════════════════════════════════════════════════════
           SECTION 2 — STEAM PLATFORM INSIGHTS (Database / Dataset)
       ══════════════════════════════════════════════════════════════════════ */}
       <div className="glass-panel">
         <SectionHeader
-          title="🌐 Steam Platform Insights"
+          title="Steam Platform Insights"
           subtitle="Visualizations powered by imported Kaggle dataset — all ~70k+ games on Steam."
         />
         <TabBar tabs={DB_TABS} active={dbTab} onSelect={setDbTab} />

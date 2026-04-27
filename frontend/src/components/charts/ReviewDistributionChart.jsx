@@ -6,6 +6,7 @@ import { positionTooltip } from '../../utils/tooltip.js';
 /** Histogram of overall review score distribution (0–100%) from steam_games DB table. */
 function ReviewDistributionChart() {
   const chartRef = useRef();
+  const wrapRef  = useRef();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [data, setData] = useState([]);
@@ -27,7 +28,8 @@ function ReviewDistributionChart() {
     d3.select(chartRef.current).selectAll('*').remove();
 
     const margin = { top: 20, right: 30, bottom: 50, left: 60 };
-    const width = 680 - margin.left - margin.right;
+    const containerW = wrapRef.current?.getBoundingClientRect().width || 680;
+    const width = Math.max(containerW - margin.left - margin.right, 320);
     const height = 280 - margin.top - margin.bottom;
 
     const svg = d3.select(chartRef.current)
@@ -112,11 +114,13 @@ function ReviewDistributionChart() {
   if (loading) return <div className="skeleton-graph"></div>;
   if (error) return <p style={{ color: '#ef4444' }}>{error}</p>;
   return (
-    <div>
+    <div ref={wrapRef} style={{ width: '100%' }}>
+      <div>
       <p style={{ color: '#64748b', fontSize: '0.8rem', marginTop: 0, marginBottom: '0.75rem' }}>
         Distribution of all Steam games by their overall positive review percentage. Color goes red → green with score.
       </p>
       <div className="chart-scroll" ref={chartRef} style={{ overflowX: 'auto', display: 'flex', justifyContent: 'center' }} />
+      </div>
     </div>
   );
 }

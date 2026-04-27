@@ -8,6 +8,7 @@ import { positionTooltip } from '../../utils/tooltip.js';
  */
 function ReleaseYearChart() {
   const chartRef = useRef();
+  const wrapRef  = useRef();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [data, setData] = useState([]);
@@ -37,7 +38,8 @@ function ReleaseYearChart() {
     d3.select(chartRef.current).selectAll('*').remove();
 
     const margin = { top: 20, right: 30, bottom: 40, left: 60 };
-    const width = 760 - margin.left - margin.right;
+    const containerW = wrapRef.current?.getBoundingClientRect().width || 760;
+    const width = Math.max(containerW - margin.left - margin.right, 320);
     const height = 300 - margin.top - margin.bottom;
 
     const svg = d3.select(chartRef.current)
@@ -153,11 +155,13 @@ function ReleaseYearChart() {
   if (error) return <p style={{ color: '#ef4444' }}>{error}</p>;
 
   return (
-    <div>
+    <div ref={wrapRef} style={{ width: '100%' }}>
+      <div>
       <p style={{ color: '#64748b', fontSize: '0.8rem', marginTop: 0, marginBottom: '0.75rem' }}>
         The explosion of game releases on Steam since 2000.
       </p>
       <div className="chart-scroll" ref={chartRef} style={{ overflowX: 'auto', display: 'flex', justifyContent: 'center' }} />
+      </div>
     </div>
   );
 }

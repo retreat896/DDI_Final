@@ -8,9 +8,9 @@ function App() {
   return (
     <>
       <header>
-        <h1>Steam Profile Analytics</h1>
+        <h1>Steam Game Analytics</h1>
       </header>
-      
+
       <main className="container">
         <Routes>
           <Route path="/" element={<SteamLogin />} />

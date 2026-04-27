@@ -8,6 +8,7 @@ import { positionTooltip } from '../../utils/tooltip.js';
  */
 function CompareProfilesChart({ myGames, myName }) {
   const chartRef = useRef();
+  const wrapRef  = useRef();
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -71,7 +72,8 @@ function CompareProfilesChart({ myGames, myName }) {
     d3.select(chartRef.current).selectAll('*').remove();
 
     const margin = { top: 20, right: 20, bottom: 130, left: 65 };
-    const width = 820 - margin.left - margin.right;
+    const containerW = wrapRef.current?.getBoundingClientRect().width || 820;
+    const width = Math.max(containerW - margin.left - margin.right, 320);
     const height = 360 - margin.top - margin.bottom;
 
     const svg = d3.select(chartRef.current)
@@ -162,7 +164,8 @@ function CompareProfilesChart({ myGames, myName }) {
   }, [myGames, theirGames, myName, theirName]);
 
   return (
-    <div>
+    <div ref={wrapRef} style={{ width: '100%' }}>
+      <div>
       <p style={{ color: '#64748b', fontSize: '0.8rem', marginTop: 0, marginBottom: '1rem' }}>
         Look up another Steam profile to compare your top games side-by-side.
       </p>
@@ -207,6 +210,7 @@ function CompareProfilesChart({ myGames, myName }) {
         </div>
       )}
       <div className="chart-scroll" ref={chartRef} style={{ overflowX: 'auto', display: 'flex', justifyContent: 'center' }} />
+      </div>
     </div>
   );
 }

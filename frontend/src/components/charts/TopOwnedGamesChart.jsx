@@ -9,6 +9,7 @@ import { positionTooltip } from '../../utils/tooltip.js';
  */
 function TopOwnedGamesChart({ userGames }) {
   const chartRef = useRef();
+  const wrapRef  = useRef();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [dbGames, setDbGames] = useState([]);
@@ -48,7 +49,8 @@ function TopOwnedGamesChart({ userGames }) {
 
     // Right margin: wider when legend is shown, tighter when not
     const margin = { top: 10, right: hasLibrary ? 170 : 20, bottom: 50, left: 160 };
-    const width = 760 - margin.left - margin.right;
+    const containerW = wrapRef.current?.getBoundingClientRect().width || 760;
+    const width = Math.max(containerW - margin.left - margin.right, 320);
     const height = Math.max(data.length * 34, 200);
 
     const svg = d3.select(chartRef.current)
@@ -138,7 +140,7 @@ function TopOwnedGamesChart({ userGames }) {
         const pct = total > 0 ? ((pos / total) * 100).toFixed(1) : '?';
         // Only show ownership hint when library is loaded
         const ownedLine = hasLibrary && userAppIds.has(String(d.appid))
-          ? '<br/>✅ <strong>You own this</strong>'
+          ? '<br/><strong>You own this</strong>'
           : '';
         tooltip.style('opacity', 1);
         tooltip.html(
@@ -178,7 +180,8 @@ function TopOwnedGamesChart({ userGames }) {
   if (loading) return <div className="skeleton-graph"></div>;
   if (error) return <p style={{ color: '#ef4444' }}>{error}</p>;
   return (
-    <div>
+    <div ref={wrapRef} style={{ width: '100%' }}>
+      <div>
       <p style={{ color: '#64748b', fontSize: '0.8rem', marginTop: 0, marginBottom: '0.75rem' }}>
         Most-owned games across the entire Steam dataset.{' '}
         {hasLibrary
@@ -186,6 +189,7 @@ function TopOwnedGamesChart({ userGames }) {
           : <span>Sign in to highlight games you already own.</span>}
       </p>
       <div className="chart-scroll" ref={chartRef} style={{ overflowX: 'auto', display: 'flex', justifyContent: 'center' }} />
+      </div>
     </div>
   );
 }

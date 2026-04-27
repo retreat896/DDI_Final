@@ -6,6 +6,7 @@ import { positionTooltip } from '../../utils/tooltip.js';
 /** Horizontal bar chart of top genres by game count from the DB. */
 function GenreBreakdownChart() {
   const chartRef = useRef();
+  const wrapRef  = useRef();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [data, setData] = useState([]);
@@ -27,7 +28,8 @@ function GenreBreakdownChart() {
     d3.select(chartRef.current).selectAll('*').remove();
 
     const margin = { top: 10, right: 120, bottom: 20, left: 130 };
-    const width = 680 - margin.left - margin.right;
+    const containerW = wrapRef.current?.getBoundingClientRect().width || 680;
+    const width = Math.max(containerW - margin.left - margin.right, 320);
     const height = Math.max(data.length * 30, 200);
 
     const svg = d3.select(chartRef.current)
@@ -100,11 +102,13 @@ function GenreBreakdownChart() {
   if (loading) return <div className="skeleton-graph"></div>;
   if (error) return <p style={{ color: '#ef4444' }}>{error}</p>;
   return (
-    <div>
+    <div ref={wrapRef} style={{ width: '100%' }}>
+      <div>
       <p style={{ color: '#64748b', fontSize: '0.8rem', marginTop: 0, marginBottom: '0.75rem' }}>
         Game count per primary genre across all titles in the dataset.
       </p>
       <div className="chart-scroll" ref={chartRef} style={{ overflowX: 'auto', display: 'flex', justifyContent: 'center' }} />
+      </div>
     </div>
   );
 }
