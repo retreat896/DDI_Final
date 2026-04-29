@@ -46,6 +46,9 @@ const args = [
 console.log(`Building frontend → ${OUT_DIR}`);
 if (WATCH) console.log('   (watch mode — rebuilds on file changes)\n');
 
+console.log('Ensuring frontend dependencies are installed...');
+execSync('npm install', { cwd: FRONTEND_DIR, stdio: 'inherit' });
+
 if (WATCH) {
   // In watch mode, spawn so the process stays alive
   const child = spawn('npx', args, {
