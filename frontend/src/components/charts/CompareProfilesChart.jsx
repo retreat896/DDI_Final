@@ -226,7 +226,7 @@ function CompareProfilesChart({ myGames, myName, theirGames, theirName }) {
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ color: '#f59e0b', fontSize: '1.5rem', fontWeight: 'bold' }}>
-                    {comparisonStats.theirStats.totalPlaytime.toFixed(0)}h
+                    {comparisonStats.theirStats.recentPlaytime.toFixed(1)}h
                   </div>
                   <div style={{ color: '#64748b', fontSize: '0.8rem' }}>{theirName}</div>
                 </div>
