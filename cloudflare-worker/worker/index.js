@@ -132,15 +132,14 @@ app.get('/api/auth/callback', async (c) => {
 
   const maxAge = 86400 * 30;
   const opts = `Max-Age=${maxAge}; Path=/; SameSite=Lax`;
+  
+  const headers = new Headers({ Location: `${frontendUrl}/login` });
+  headers.append('Set-Cookie', `steamid=${steamId}; ${opts}`);
+  headers.append('Set-Cookie', `user_profile=${encodeURIComponent(JSON.stringify(profile))}; ${opts}`);
+
   return new Response(null, {
     status: 302,
-    headers: {
-      Location: frontendUrl,
-      'Set-Cookie': [
-        `steamid=${steamId}; ${opts}`,
-        `user_profile=${encodeURIComponent(JSON.stringify(profile))}; ${opts}`,
-      ].join(', '),
-    },
+    headers,
   });
 });
 
