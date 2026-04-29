@@ -166,7 +166,7 @@ function CompareProfilesChart({ myGames, myName, theirGames, theirName }) {
   }, [myGames, theirGames, myName, theirName]);
 
   return (
-    <div ref={wrapRef} style={{ width: '100%', maxHeight: '80vh', overflowY: 'auto' }}>
+    <div ref={wrapRef} style={{ width: '100%' }}>
       <div>
       {!theirGames && (
         <div style={{ textAlign: 'center', padding: '2rem', color: '#475569', fontSize: '0.9rem' }}>
