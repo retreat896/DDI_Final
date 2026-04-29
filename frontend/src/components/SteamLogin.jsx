@@ -29,7 +29,7 @@ function SteamLogin() {
 
   const handleLogin = () => {
     const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:5000';
-    window.location.href = `${API_BASE}/api/auth/login`;
+    window.location.href = `${API_BASE}/api/auth/steam`;
   };
 
   const handleManualResolve = async (e) => {

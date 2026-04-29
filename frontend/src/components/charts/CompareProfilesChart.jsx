@@ -1,46 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
-import axios from 'axios';
 import { positionTooltip } from '../../utils/tooltip.js';
 
 /**
  * Side-by-side grouped bar chart comparing top 10 games of two Steam profiles.
  */
-function CompareProfilesChart({ myGames, myName }) {
+function CompareProfilesChart({ myGames, myName, theirGames, theirName }) {
   const chartRef = useRef();
   const wrapRef  = useRef();
-  const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [theirGames, setTheirGames] = useState(null);
-  const [theirName, setTheirName] = useState('');
   const [comparisonStats, setComparisonStats] = useState(null);
-
-  const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:5000';
-
-  const handleLookup = async (e) => {
-    e.preventDefault();
-    if (!input.trim()) return;
-    setError('');
-    setLoading(true);
-    try {
-      const resolveRes = await axios.post(`${API_BASE}/api/auth/resolve`, { input: input.trim() });
-      const { steamid, persona_name } = resolveRes.data;
-      if (!steamid) {
-        setError('Could not resolve that Steam profile.');
-        setLoading(false);
-        return;
-      }
-      const gamesRes = await axios.get(`${API_BASE}/api/games/${steamid}`);
-      const games = gamesRes.data?.response?.games || [];
-      setTheirGames(games);
-      setTheirName(persona_name || steamid);
-    } catch (err) {
-      setError(err.response?.data?.error || 'Failed to load profile. Make sure the profile is public.');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   useEffect(() => {
     if (!myGames || myGames.length === 0 || !theirGames || theirGames.length === 0) {
@@ -200,52 +168,14 @@ function CompareProfilesChart({ myGames, myName }) {
   return (
     <div ref={wrapRef} style={{ width: '100%', maxHeight: '80vh', overflowY: 'auto' }}>
       <div>
-      <p style={{ color: '#64748b', fontSize: '0.8rem', marginTop: 0, marginBottom: '1rem' }}>
-        Look up another Steam profile to compare your top games side-by-side.
-      </p>
-      <form onSubmit={handleLookup} style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-        <input
-          type="text"
-          placeholder="Paste Steam URL, ID, or vanity name…"
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          style={{
-            flex: 1,
-            minWidth: '220px',
-            padding: '0.6rem 0.9rem',
-            borderRadius: '8px',
-            border: '1px solid rgba(255,255,255,0.15)',
-            background: 'rgba(15,23,42,0.6)',
-            color: '#f8fafc',
-            fontSize: '0.9rem',
-          }}
-        />
-        <button
-          type="submit"
-          disabled={loading}
-          style={{
-            padding: '0.6rem 1.4rem',
-            borderRadius: '8px',
-            background: 'linear-gradient(90deg,#3b82f6,#8b5cf6)',
-            border: 'none',
-            color: '#fff',
-            fontWeight: 600,
-            cursor: loading ? 'not-allowed' : 'pointer',
-            opacity: loading ? 0.7 : 1,
-          }}
-        >
-          {loading ? 'Loading…' : 'Compare'}
-        </button>
-      </form>
-      {error && <p style={{ color: '#ef4444', fontSize: '0.85rem', marginBottom: '0.75rem' }}>{error}</p>}
-      {!theirGames && !loading && (
+      {!theirGames && (
         <div style={{ textAlign: 'center', padding: '2rem', color: '#475569', fontSize: '0.9rem' }}>
-          Enter a Steam profile above to begin comparison
+          Add a profile in the header to begin comparison
         </div>
       )}
       <div className="chart-scroll" ref={chartRef} style={{ overflowX: 'auto', display: 'flex', justifyContent: 'center', marginBottom: '2rem' }} />
 
-      {theirGames && myGames && (
+      {theirGames && myGames && comparisonStats && (
         <div style={{ marginTop: '2rem' }}>
           <h4 style={{ color: '#f8fafc', marginBottom: '1.5rem', fontSize: '1.1rem' }}>Overall Statistics Comparison</h4>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>

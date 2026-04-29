@@ -49,6 +49,16 @@ function ReviewDistributionChart() {
     // Color scale: red (low) -> yellow (mid) -> green (high reviews)
     const colorScale = d3.scaleSequential(d3.interpolateRdYlGn).domain([0, 100]);
 
+    const defs = svg.append('defs');
+    data.forEach((d, i) => {
+      const grad = defs.append('linearGradient').attr('id', `rev-grad-${i}`)
+        .attr('x1','0%').attr('y1','100%').attr('x2','0%').attr('y2','0%');
+      const baseColor = d3.color(colorScale(+d.bucket));
+      const lightColor = baseColor.brighter(0.6);
+      grad.append('stop').attr('offset','0%').attr('stop-color', baseColor);
+      grad.append('stop').attr('offset','100%').attr('stop-color', lightColor);
+    });
+
     // Grid
     svg.selectAll('line.grid-y')
       .data(y.ticks(5))
@@ -91,7 +101,7 @@ function ReviewDistributionChart() {
       .attr('y', height)
       .attr('width', bandWidth)
       .attr('height', 0)
-      .attr('fill', d => colorScale(+d.bucket))
+      .attr('fill', (d, i) => `url(#rev-grad-${i})`)
       .attr('rx', 3)
       .attr('opacity', 0.88)
       .on('mouseover', function (event, d) {

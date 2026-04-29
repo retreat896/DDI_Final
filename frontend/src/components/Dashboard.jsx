@@ -28,7 +28,6 @@ const PERSONAL_TABS = [
   { id: 'donut',     label: 'Playtime Share' },
   { id: 'scatter',   label: 'Recent Activity' },
   { id: 'library',   label: 'Library Breakdown' },
-  { id: 'compare',   label: 'Compare Profiles' },
 ];
 
 const DB_TABS = [
@@ -78,6 +77,11 @@ function Dashboard() {
   const [personalTab, setPersonalTab] = useState('overview');
   const [dbTab, setDbTab] = useState('genres');
   const [isGuest, setIsGuest] = useState(false);
+  const [comparedPlayer, setComparedPlayer] = useState(null);
+  const [comparedGames, setComparedGames] = useState(null);
+  const [compareLoading, setCompareLoading] = useState(false);
+  const [compareError, setCompareError] = useState('');
+  const [compareInput, setCompareInput] = useState('');
   const navigate = useNavigate();
   const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:5000';
   const { steamApiEnabled } = useServerConfig();
@@ -124,6 +128,30 @@ function Dashboard() {
 
     fetchData();
   }, [navigate, API_BASE]);
+
+  const handleCompareLookup = async (e) => {
+    e.preventDefault();
+    if (!compareInput.trim()) return;
+    setCompareError('');
+    setCompareLoading(true);
+    try {
+      const resolveRes = await axios.post(`${API_BASE}/api/auth/resolve`, { input: compareInput.trim() });
+      const { steamid, persona_name, avatar_url, profile_url } = resolveRes.data;
+      if (!steamid) {
+        setCompareError('Could not resolve that Steam profile.');
+        setCompareLoading(false);
+        return;
+      }
+      const gamesRes = await axios.get(`${API_BASE}/api/games/${steamid}`);
+      const games = gamesRes.data?.response?.games || [];
+      setComparedGames(games);
+      setComparedPlayer({ steam_id: steamid, persona_name: persona_name || steamid, avatar_url, profile_url });
+    } catch (err) {
+      setCompareError(err.response?.data?.error || 'Failed to load profile.');
+    } finally {
+      setCompareLoading(false);
+    }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('steamid');
@@ -175,37 +203,97 @@ function Dashboard() {
           </button>
         </div>
       ) : player && (
-        <div className="glass-panel" style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: '1.5rem',
-          flexWrap: 'wrap',
-          gap: '1rem',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-            {player.avatar_url && (
-              <img src={player.avatar_url} alt="Avatar" style={{
-                borderRadius: '10px', width: '64px', height: '64px',
-                border: '2px solid rgba(59,130,246,0.4)',
-              }} />
-            )}
-            <div>
-              <h2 style={{ margin: 0, marginBottom: '0.25rem' }}>
-                {player.persona_name || player.steamid || 'Steam Player'}
-              </h2>
-              {player.profile_url && (
-                <a href={player.profile_url} target="_blank" rel="noreferrer"
-                  style={{ color: 'var(--accent-color)', fontSize: '0.85rem' }}>
-                  View Steam Profile ↗
-                </a>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem', marginBottom: '1.5rem' }}>
+          
+          {/* Main User Card */}
+          <div className="glass-panel" style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            margin: 0, gap: '1rem', flexWrap: 'wrap'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+              {player.avatar_url && (
+                <img src={player.avatar_url} alt="Avatar" style={{
+                  borderRadius: '10px', width: '64px', height: '64px',
+                  border: '2px solid rgba(59,130,246,0.4)',
+                }} />
               )}
+              <div>
+                <h2 style={{ margin: 0, marginBottom: '0.25rem' }}>
+                  {player.persona_name || player.steamid || 'Steam Player'}
+                </h2>
+                {player.profile_url && (
+                  <a href={player.profile_url} target="_blank" rel="noreferrer"
+                    style={{ color: 'var(--accent-color)', fontSize: '0.85rem' }}>
+                    View Steam Profile ↗
+                  </a>
+                )}
+              </div>
             </div>
+            <button className="btn-primary" onClick={handleLogout} style={{
+              background: 'transparent', border: '1px solid var(--glass-border)',
+              padding: '8px 18px', fontSize: '0.9rem',
+            }}>Logout</button>
           </div>
-          <button className="btn-primary" onClick={handleLogout} style={{
-            background: 'transparent', border: '1px solid var(--glass-border)',
-            padding: '8px 18px', fontSize: '0.9rem',
-          }}>Logout</button>
+
+          {/* Compared User Card / Add Form */}
+          <div className="glass-panel" style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            margin: 0, minHeight: '100px'
+          }}>
+            {!comparedPlayer ? (
+              <div style={{ width: '100%' }}>
+                <p style={{ margin: '0 0 0.5rem 0', color: '#94a3b8', fontSize: '0.85rem' }}>Compare with another player:</p>
+                <form onSubmit={handleCompareLookup} style={{ display: 'flex', gap: '0.5rem' }}>
+                  <input
+                    type="text"
+                    placeholder="Steam URL or ID..."
+                    value={compareInput}
+                    onChange={e => setCompareInput(e.target.value)}
+                    style={{
+                      flex: 1, padding: '0.5rem 0.75rem', borderRadius: '6px',
+                      border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(15,23,42,0.6)',
+                      color: '#f8fafc', fontSize: '0.85rem', width: '100%'
+                    }}
+                  />
+                  <button type="submit" disabled={compareLoading} style={{
+                    padding: '0.5rem 1rem', borderRadius: '6px',
+                    background: 'linear-gradient(90deg,#3b82f6,#8b5cf6)', border: 'none',
+                    color: '#fff', fontWeight: 600, cursor: compareLoading ? 'not-allowed' : 'pointer',
+                    opacity: compareLoading ? 0.7 : 1,
+                  }}>
+                    {compareLoading ? '...' : 'Add'}
+                  </button>
+                </form>
+                {compareError && <p style={{ margin: '0.5rem 0 0', color: '#ef4444', fontSize: '0.8rem' }}>{compareError}</p>}
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '1rem', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+                  {comparedPlayer.avatar_url && (
+                    <img src={comparedPlayer.avatar_url} alt="Avatar" style={{
+                      borderRadius: '10px', width: '64px', height: '64px',
+                      border: '2px solid rgba(245,158,11,0.4)',
+                    }} />
+                  )}
+                  <div>
+                    <h2 style={{ margin: 0, marginBottom: '0.25rem' }}>
+                      {comparedPlayer.persona_name}
+                    </h2>
+                    {comparedPlayer.profile_url && (
+                      <a href={comparedPlayer.profile_url} target="_blank" rel="noreferrer"
+                        style={{ color: '#f59e0b', fontSize: '0.85rem' }}>
+                        View Steam Profile ↗
+                      </a>
+                    )}
+                  </div>
+                </div>
+                <button className="btn-primary" onClick={() => { setComparedPlayer(null); setComparedGames(null); setCompareInput(''); }} style={{
+                  background: 'transparent', border: '1px solid rgba(245,158,11,0.3)', color: '#f59e0b',
+                  padding: '8px 18px', fontSize: '0.9rem',
+                }}>Remove</button>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -302,14 +390,6 @@ function Dashboard() {
                     : <p style={{ color: '#475569' }}>No game data available or profile is private.</p>}
                 </>
               )}
-
-              {personalTab === 'compare' && (
-                <>
-                  {games.length > 0
-                    ? <CompareProfilesChart myGames={games} myName={player?.persona_name || 'You'} />
-                    : <p style={{ color: '#475569' }}>No game data available or profile is private.</p>}
-                </>
-              )}
             </div>
           </>
         )}
@@ -331,6 +411,40 @@ function Dashboard() {
             Share, Recent Activity, Library Breakdown, Compare Profiles) are disabled. Add a{' '}
             <code>STEAM_API_KEY</code> to the server environment to enable them.
           </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          SECTION 1.5 — COMPARISON DASHBOARD
+      ══════════════════════════════════════════════════════════════════════ */}
+      {steamApiEnabled && !isGuest && (
+        <div className="glass-panel" style={{ marginBottom: '1.5rem' }}>
+          <SectionHeader
+            title="Comparison Dashboard"
+            subtitle="Head-to-head comparison of your library vs. another player."
+          />
+          {!comparedPlayer ? (
+            <div style={{
+              textAlign: 'center', padding: '3rem 1rem', border: '1px dashed rgba(245,158,11,0.3)',
+              borderRadius: '12px', background: 'rgba(245,158,11,0.04)', position: 'relative'
+            }}>
+              <h3 style={{ marginBottom: '0.5rem', color: '#fbbf24' }}>Compare Profiles</h3>
+              <p style={{ color: '#94a3b8', maxWidth: '380px', margin: '0 auto 1.5rem' }}>
+                Add a second Steam profile in the header above to see how your top games and playtimes stack up against theirs.
+              </p>
+            </div>
+          ) : comparedGames && comparedGames.length > 0 ? (
+            <CompareProfilesChart 
+              myGames={games} 
+              myName={player?.persona_name || 'You'} 
+              theirGames={comparedGames} 
+              theirName={comparedPlayer.persona_name} 
+            />
+          ) : (
+            <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8', fontSize: '0.9rem' }}>
+              This profile has no public game data available to compare.
+            </div>
+          )}
         </div>
       )}
 

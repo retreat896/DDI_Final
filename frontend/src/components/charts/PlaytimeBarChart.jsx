@@ -48,10 +48,19 @@ function PlaytimeBarChart({ games, onGameClick }) {
       .attr('transform', `translate(${margin.left},${margin.top})`);
 
     const defs = svg.append('defs');
-    const gradient = defs.append('linearGradient').attr('id', 'pb-grad')
-      .attr('x1','0%').attr('y1','0%').attr('x2','0%').attr('y2','100%');
-    gradient.append('stop').attr('offset','0%') .attr('stop-color','#3b82f6');
-    gradient.append('stop').attr('offset','100%').attr('stop-color','#8b5cf6');
+    const colors = [
+      ['#60a5fa', '#3b82f6'], ['#a78bfa', '#8b5cf6'], ['#f472b6', '#ec4899'],
+      ['#fb7185', '#f43f5e'], ['#fb923c', '#f97316'], ['#fbbf24', '#f59e0b'],
+      ['#facc15', '#eab308'], ['#a3e635', '#84cc16'], ['#4ade80', '#22c55e'],
+      ['#34d399', '#10b981'], ['#2dd4bf', '#14b8a6'], ['#22d3ee', '#06b6d4'],
+      ['#38bdf8', '#0ea5e9'], ['#818cf8', '#6366f1'], ['#e879f9', '#d946ef']
+    ];
+    colors.forEach((c, i) => {
+      const grad = defs.append('linearGradient').attr('id', `pb-grad-${i}`)
+        .attr('x1','0%').attr('y1','0%').attr('x2','0%').attr('y2','100%');
+      grad.append('stop').attr('offset','0%').attr('stop-color', c[0]);
+      grad.append('stop').attr('offset','100%').attr('stop-color', c[1]);
+    });
 
     const x = d3.scaleBand().range([0, width]).domain(data.map(d => d.name)).padding(0.22);
     const y = d3.scaleLinear().domain([0, d3.max(data, d => d.hours) * 1.1]).range([height, 0]);
@@ -87,7 +96,7 @@ function PlaytimeBarChart({ games, onGameClick }) {
       .data(data).enter().append('rect').attr('class','bar')
       .attr('x', d => x(d.name)).attr('width', x.bandwidth())
       .attr('y', height).attr('height', 0)
-      .attr('fill','url(#pb-grad)').attr('rx', 4)
+      .attr('fill', (d, i) => `url(#pb-grad-${i % colors.length})`).attr('rx', 4)
       .style('cursor', onGameClick ? 'pointer' : 'default')
       .on('click', (event, d) => { if (onGameClick) onGameClick(d.appid); })
       .on('mouseover', function(event, d) {

@@ -114,13 +114,13 @@ def auth_callback():
             # Redirect back to frontend and set cookies
             import json
             from flask import make_response
-            resp = redirect(f"{FRONTEND_URL}")
+            resp = redirect(f"{FRONTEND_URL}/login")
             resp.set_cookie('steamid', steam_id, max_age=86400*30, httponly=False, samesite='Lax')
             if profile_data:
                 profile_json = json.dumps(profile_data)
                 resp.set_cookie('user_profile', urllib.parse.quote(profile_json), max_age=86400*30, httponly=False, samesite='Lax')
             return resp
-    return redirect(f"{FRONTEND_URL}?error=authentication_failed")
+    return redirect(f"{FRONTEND_URL}/login?error=authentication_failed")
 
 @app.route('/api/auth/resolve', methods=['POST'])
 def resolve_steam_id():
@@ -232,7 +232,7 @@ def get_games(steamid):
     r = requests.get(url)
     if r.status_code == 200:
         return jsonify(r.json())
-    return jsonify({"error": "Failed to fetch games"}), 500
+    return jsonify({"error": "Failed to fetch games"}), r.status_code
 
 @app.route('/api/analytics/genres')
 def analytics_genres():

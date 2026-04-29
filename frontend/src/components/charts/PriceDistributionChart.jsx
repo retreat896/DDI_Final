@@ -90,9 +90,16 @@ function PriceDistributionChart() {
     // Defs
     const defs = svg.append('defs');
     const areaGrad = defs.append('linearGradient').attr('id', 'pm-area-grad')
-      .attr('x1','0%').attr('y1','0%').attr('x2','0%').attr('y2','100%');
-    areaGrad.append('stop').attr('offset','0%') .attr('stop-color','rgba(59,130,246,0.55)');
-    areaGrad.append('stop').attr('offset','100%').attr('stop-color','rgba(59,130,246,0.02)');
+      .attr('x1','0%').attr('y1','0%').attr('x2','100%').attr('y2','0%');
+    areaGrad.append('stop').attr('offset','0%') .attr('stop-color','rgba(59,130,246,0.3)');
+    areaGrad.append('stop').attr('offset','50%') .attr('stop-color','rgba(139,92,246,0.3)');
+    areaGrad.append('stop').attr('offset','100%').attr('stop-color','rgba(236,72,153,0.3)');
+    
+    const lineGrad = defs.append('linearGradient').attr('id', 'pm-line-grad')
+      .attr('x1','0%').attr('y1','0%').attr('x2','100%').attr('y2','0%');
+    lineGrad.append('stop').attr('offset','0%').attr('stop-color','#3b82f6');
+    lineGrad.append('stop').attr('offset','50%').attr('stop-color','#8b5cf6');
+    lineGrad.append('stop').attr('offset','100%').attr('stop-color','#ec4899');
     const glow = defs.append('filter').attr('id','pm-glow');
     glow.append('feGaussianBlur').attr('stdDeviation','3').attr('result','coloredBlur');
     const merge = glow.append('feMerge');
@@ -140,7 +147,7 @@ function PriceDistributionChart() {
     const lineGen = d3.line()
       .x(d => x(d.bucket)).y(d => y(+d.count)).curve(d3.curveMonotoneX);
     const linePath = svg.append('path').datum(data)
-      .attr('fill','none').attr('stroke','#3b82f6').attr('stroke-width',3)
+      .attr('fill','none').attr('stroke','url(#pm-line-grad)').attr('stroke-width',3)
       .attr('filter','url(#pm-glow)').attr('d', lineGen);
     const tl = linePath.node().getTotalLength();
     linePath.attr('stroke-dasharray',`${tl} ${tl}`).attr('stroke-dashoffset', tl)
@@ -155,10 +162,12 @@ function PriceDistributionChart() {
     // Dots + labels
     svg.selectAll('.dot').data(data).join('circle').attr('class','dot')
       .attr('cx', d => x(d.bucket)).attr('cy', d => y(+d.count))
-      .attr('r', 5).attr('fill','#0f172a').attr('stroke','#60a5fa').attr('stroke-width',2.5)
+      .attr('r', 5).attr('fill','#0f172a')
+      .attr('stroke', (d, i) => d3.interpolateRainbow(i / data.length)).attr('stroke-width',2.5)
       .attr('opacity', 0)
       .on('mouseover', function(event, d) {
-        d3.select(this).attr('r',7).attr('fill','#60a5fa');
+        const idx = data.indexOf(d);
+        d3.select(this).attr('r',7).attr('fill', d3.interpolateRainbow(idx / data.length));
         tip.style('opacity',1)
           .html(`<strong>${d.bucket}</strong><br/>${(+d.count).toLocaleString()} games`);
         positionTooltip(tip, event);
