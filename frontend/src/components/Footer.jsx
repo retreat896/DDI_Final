@@ -9,6 +9,7 @@ function Footer() {
       <nav>
         <Link to="/legal">Privacy Policy & Disclaimers</Link>
       </nav>
+      <p style={{ marginTop: '1rem', fontSize: '0.75rem', color: '#475569' }}>v1.0.0</p>
     </footer>
   );
 }
