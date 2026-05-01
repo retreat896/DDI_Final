@@ -8,6 +8,7 @@ function StatsCards({ games }) {
   const playedGames = games.filter(g => g.playtime_forever > 0);
   const totalHours = playedGames.reduce((acc, g) => acc + g.playtime_forever / 60, 0);
   const recentGames = games.filter(g => g.playtime_2weeks > 0).length;
+  const recentHours = games.filter(g => g.playtime_2weeks > 0).reduce((acc, g) => acc + g.playtime_2weeks / 60, 0);
   const avgHours = playedGames.length > 0 ? totalHours / playedGames.length : 0;
 
   const cards = [
@@ -29,8 +30,8 @@ function StatsCards({ games }) {
     },
     {
       label: 'Active Recently',
-      value: recentGames,
-      sub: 'last 2 weeks',
+      value: `${recentGames} games`,
+      sub: `${recentHours.toFixed(1)}h played`,
       icon: '',
       color: '#f59e0b',
     },
