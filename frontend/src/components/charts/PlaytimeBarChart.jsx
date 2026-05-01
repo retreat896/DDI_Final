@@ -104,9 +104,6 @@ function PlaytimeBarChart({ games, onGameClick }) {
         tip.style('opacity',1).html(`<strong>${d.name}</strong><br/>${d.hours}h played`);
         positionTooltip(tip, event);
       })
-      .on('mousemove', function(event) {
-        positionTooltip(tip, event);
-      })
       .on('mouseout', function() { d3.select(this).attr('opacity',1); tip.style('opacity',0); })
       .transition().duration(700).delay((d,i) => i * 40)
       .attr('y', d => y(d.hours))

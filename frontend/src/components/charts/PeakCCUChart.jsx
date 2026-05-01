@@ -37,7 +37,7 @@ function PeakCCUChart({ userGames }) {
     const ownedIds = Array.isArray(userGames) ? new Set(userGames.map(g => String(g.appid))) : new Set();
     const owned = ownedIds.size > 0;
     d3.select(chartRef.current).selectAll('rect')
-      .attr('fill', (d, i) => owned && ownedIds.has(String(d?.appid)) ? 'url(#ccu-grad-owned)' : `url(#ccu-grad-${i % 15})`)
+      .attr('fill', d => owned && ownedIds.has(String(d?.appid)) ? '#fbbf24' : '#14b8a6')
       .attr('opacity', d => owned && ownedIds.has(String(d?.appid)) ? 0.95 : 0.75);
     d3.select(chartRef.current).selectAll('.tick text')
       .style('fill', d => {
@@ -80,23 +80,6 @@ function PeakCCUChart({ userGames }) {
       .attr('transform', `translate(${margin.left},${margin.top})`);
 
     const defs = svg.append('defs');
-    const colors = [
-      ['#60a5fa', '#3b82f6'], ['#a78bfa', '#8b5cf6'], ['#f472b6', '#ec4899'],
-      ['#fb7185', '#f43f5e'], ['#fb923c', '#f97316'], ['#fbbf24', '#f59e0b'],
-      ['#facc15', '#eab308'], ['#a3e635', '#84cc16'], ['#4ade80', '#22c55e'],
-      ['#34d399', '#10b981'], ['#2dd4bf', '#14b8a6'], ['#22d3ee', '#06b6d4'],
-      ['#38bdf8', '#0ea5e9'], ['#818cf8', '#6366f1'], ['#e879f9', '#d946ef']
-    ];
-    colors.forEach((c, i) => {
-      const grad = defs.append('linearGradient').attr('id', `ccu-grad-${i}`)
-        .attr('x1','0%').attr('y1','0%').attr('x2','100%').attr('y2','0%');
-      grad.append('stop').attr('offset','0%').attr('stop-color', c[0]);
-      grad.append('stop').attr('offset','100%').attr('stop-color', c[1]);
-    });
-    const goldGrad = defs.append('linearGradient').attr('id', `ccu-grad-owned`)
-      .attr('x1','0%').attr('y1','0%').attr('x2','100%').attr('y2','0%');
-    goldGrad.append('stop').attr('offset','0%').attr('stop-color', '#fde047');
-    goldGrad.append('stop').attr('offset','100%').attr('stop-color', '#fbbf24');
 
     const y = d3.scaleBand()
       .domain(data.map(d => d.name))
@@ -166,7 +149,7 @@ function PeakCCUChart({ userGames }) {
       .attr('x', d => x(x.domain()[0]))
       .attr('height', y.bandwidth())
       .attr('width', 0)
-      .attr('fill', (d, i) => hasLibrary && userAppIds.has(String(d.appid)) ? 'url(#ccu-grad-owned)' : `url(#ccu-grad-${i % colors.length})`)
+      .attr('fill', d => hasLibrary && userAppIds.has(String(d.appid)) ? '#fbbf24' : '#14b8a6')
       .attr('rx', 4)
       .attr('opacity', d => hasLibrary && userAppIds.has(String(d.appid)) ? 0.95 : 0.75)
       .on('mouseover', function (event, d) {
