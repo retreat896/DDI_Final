@@ -8,6 +8,7 @@ import PlaytimeBarChart from './charts/PlaytimeBarChart';
 import PlaytimeDonutChart from './charts/PlaytimeDonutChart';
 import RecentVsTotalScatter from './charts/RecentVsTotalScatter';
 import LibraryBreakdownChart from './charts/LibraryBreakdownChart';
+import OwnedGenreRadarChart from './charts/OwnedGenreRadarChart';
 import CompareProfilesChart from './charts/CompareProfilesChart';
 
 // --- Database / Dataset charts ---
@@ -28,6 +29,7 @@ const PERSONAL_TABS = [
   { id: 'donut',     label: 'Playtime Share' },
   { id: 'scatter',   label: 'Recent Activity' },
   { id: 'library',   label: 'Library Breakdown' },
+  { id: 'genres',    label: 'Genres' },
 ];
 
 const DB_TABS = [
@@ -387,6 +389,14 @@ function Dashboard() {
                 <>
                   {games.length > 0
                     ? <LibraryBreakdownChart games={games} />
+                    : <p style={{ color: '#475569' }}>No game data available or profile is private.</p>}
+                </>
+              )}
+
+              {personalTab === 'genres' && (
+                <>
+                  {games.length > 0
+                    ? <OwnedGenreRadarChart games={games} />
                     : <p style={{ color: '#475569' }}>No game data available or profile is private.</p>}
                 </>
               )}

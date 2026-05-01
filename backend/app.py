@@ -263,6 +263,58 @@ def analytics_genres():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/analytics/owned-genres', methods=['POST'])
+def analytics_owned_genres():
+    """
+    Genre counts for a given list of owned Steam app IDs.
+    ---
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            appids:
+              type: array
+              items:
+                type: integer
+    responses:
+      200:
+        description: List of {genre, count} objects sorted descending.
+      400:
+        description: Invalid request body.
+      500:
+        description: Database error.
+    """
+    try:
+        payload = request.get_json(silent=True) or {}
+        appids = payload.get('appids')
+        if not isinstance(appids, list) or not all(isinstance(x, int) for x in appids):
+            return jsonify({"error": "appids must be an array of integers."}), 400
+        if len(appids) == 0:
+            return jsonify([])
+
+        conn = get_db_connection()
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(f'''
+                SELECT genre_primary AS genre, COUNT(*) AS count
+                FROM "{DB_SCHEMA}"."game_analytics"
+                WHERE appid = ANY(%s)
+                  AND genre_primary IS NOT NULL
+                  AND genre_primary <> ''
+                GROUP BY genre_primary
+                ORDER BY count DESC
+                LIMIT 12;
+            ''', (appids,))
+            rows = cur.fetchall()
+        conn.close()
+        return jsonify(rows)
+    except Exception as e:
+        print(f"Error in analytics_owned_genres: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/analytics/review-distribution')
 def analytics_review_distribution():
     """
