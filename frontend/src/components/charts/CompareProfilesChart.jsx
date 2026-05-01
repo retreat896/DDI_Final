@@ -191,17 +191,13 @@ function CompareProfilesChart({ myGames, myName, theirGames, theirName }) {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <div style={{ color: '#3b82f6', fontSize: '1.5rem', fontWeight: 'bold' }}>
-                    {(() => {
-                      const myTotal = myGames.reduce((sum, g) => sum + (g.playtime_forever || 0), 0) / 60;
-                      const theirTotal = theirGames.reduce((sum, g) => sum + (g.playtime_forever || 0), 0) / 60;
-                      return myTotal.toFixed(0);
-                    })()}h
+                    {comparisonStats.myStats.totalPlaytime.toFixed(0)}h
                   </div>
                   <div style={{ color: '#64748b', fontSize: '0.8rem' }}>{myName || 'You'}</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ color: '#f59e0b', fontSize: '1.5rem', fontWeight: 'bold' }}>
-                    {comparisonStats.myStats.totalPlaytime.toFixed(0)}h
+                    {comparisonStats.theirStats.totalPlaytime.toFixed(0)}h
                   </div>
                   <div style={{ color: '#64748b', fontSize: '0.8rem' }}>{theirName}</div>
                 </div>

@@ -86,8 +86,14 @@ async function fetchProfile(steamId, apiKey) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  AUTH
+//  AUTH & CONFIG
 // ═══════════════════════════════════════════════════════════════════════════
+
+app.get('/api/config', (c) => {
+  return Response.json({
+    steam_api_enabled: !!c.env.STEAM_API_KEY,
+  });
+});
 
 app.get('/api/auth/steam', (c) => {
   const origin = new URL(c.req.url).origin;
@@ -169,7 +175,7 @@ app.get('/api/games/:steamid', async (c) => {
   if (!env.STEAM_API_KEY) return jsonErr('Steam API key not configured', 500);
 
   const { steamid } = c.req.param();
-  const url = `https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key=${env.STEAM_API_KEY}&steamid=${steamid}&format=json&include_appinfo=1`;
+  const url = `https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key=${env.STEAM_API_KEY}&steamid=${steamid}&format=json&include_appinfo=1&include_played_free_games=1`;
   const res = await fetch(url);
   if (!res.ok) return jsonErr('Failed to fetch games from Steam', 500);
   return Response.json(await res.json());
