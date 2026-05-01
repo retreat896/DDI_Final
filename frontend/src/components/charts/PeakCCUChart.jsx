@@ -191,26 +191,6 @@ function PeakCCUChart({ userGames }) {
       .attr('x', x(x.domain()[0]))
       .attr('width', d => Math.max(0, x(+(d.peak_ccu || 1)) - x(x.domain()[0])));
 
-    if (hasLibrary) {
-      const leg = d3.select(chartRef.current).select('svg')
-        .append('g')
-        .attr('transform', `translate(${margin.left + width + 12}, ${margin.top + 10})`);
-
-      const legendItems = [];
-      const hasOwned = data.some(d => userAppIds.has(String(d.appid)));
-      const hasNotOwned = data.some(d => !userAppIds.has(String(d.appid)));
-
-      if (hasOwned) legendItems.push({ color: 'url(#ccu-grad-owned)', label: 'You own this' });
-      if (hasNotOwned) legendItems.push({ color: 'url(#ccu-grad-0)', label: 'Not in library' });
-
-      legendItems.forEach(({ color, label }, i) => {
-        const g = leg.append('g').attr('transform', `translate(0, ${i * 22})`);
-        g.append('rect').attr('width', 14).attr('height', 14).attr('rx', 3).attr('fill', color);
-        g.append('text').attr('x', 19).attr('y', 11)
-          .style('fill', '#94a3b8').style('font-size', '11px').text(label);
-      });
-    }
-
     return () => { d3.select('body').select('.d3-peakccu-tooltip').style('opacity', 0); };
   }
 
