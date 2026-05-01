@@ -30,8 +30,9 @@ function StatsCards({ games }) {
     },
     {
       label: 'Active Recently',
-      value: `${recentGames} games`,
-      sub: `${recentHours.toFixed(1)}h played`,
+      value: `${recentHours.toFixed(1)}h`,
+      sub: 'played in the last 2 weeks',
+      sub2: `across ${recentGames} different games`,
       icon: '',
       color: '#f59e0b',
     },
@@ -84,6 +85,7 @@ function StatsCards({ games }) {
           }}>{card.value}</span>
           <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 600 }}>{card.label}</span>
           <span style={{ fontSize: '0.72rem', color: '#475569' }}>{card.sub}</span>
+          {card.sub2 && <span style={{ fontSize: '0.72rem', color: '#475569' }}>{card.sub2}</span>}
         </div>
       ))}
     </div>
