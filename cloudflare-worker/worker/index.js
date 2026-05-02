@@ -7,10 +7,14 @@
  *              POST /api/auth/resolve
  *   Games:     GET  /api/games/:steamid
  *   Analytics: GET  /api/analytics/genres
+ *              POST /api/analytics/owned-genres
  *              GET  /api/analytics/review-distribution
- *              GET  /api/analytics/price-vs-reviews
+ *              GET  /api/analytics/price-distribution
  *              GET  /api/analytics/publisher-tiers
  *              GET  /api/analytics/top-owned
+ *              GET  /api/analytics/releases-by-year
+ *              GET  /api/analytics/peak-ccu
+ *              GET  /api/analytics/game-features
  *
  * Bindings required (wrangler.jsonc):
  *   env.DB            — D1 database
@@ -201,12 +205,42 @@ app.get('/api/analytics/genres', async (c) => {
       FROM   game_analytics
       WHERE  genre_primary IS NOT NULL AND genre_primary <> ''
       GROUP  BY genre_primary
-      ORDER  BY count DESC
-      LIMIT  20;
+      ORDER  BY count DESC;
     `).all();
     return Response.json(results);
   } catch (e) {
     console.error('analytics/genres:', e);
+    return jsonErr(e.message);
+  }
+});
+
+app.post('/api/analytics/owned-genres', async (c) => {
+  try {
+    let body;
+    try { body = await c.req.json(); }
+    catch { return jsonErr('Invalid JSON body', 400); }
+
+    const appids = body?.appids;
+    if (!Array.isArray(appids) || !appids.every(x => Number.isInteger(x))) {
+      return jsonErr('appids must be an array of integers.', 400);
+    }
+    if (appids.length === 0) {
+      return Response.json([]);
+    }
+
+    const { results } = await c.env.DB.prepare(`
+      SELECT genre_primary AS genre, COUNT(*) AS count
+      FROM game_analytics
+      WHERE appid IN (SELECT value FROM json_each(?))
+        AND genre_primary IS NOT NULL
+        AND genre_primary <> ''
+      GROUP BY genre_primary
+      ORDER BY count DESC
+      LIMIT 12;
+    `).bind(JSON.stringify(appids)).all();
+    return Response.json(results);
+  } catch (e) {
+    console.error('analytics/owned-genres:', e);
     return jsonErr(e.message);
   }
 });
