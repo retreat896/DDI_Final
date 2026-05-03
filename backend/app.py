@@ -295,6 +295,8 @@ def analytics_owned_genres():
         if len(appids) == 0:
             return jsonify([])
 
+        appids_str = [str(x) for x in appids]
+
         conn = get_db_connection()
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(f'''
@@ -306,7 +308,7 @@ def analytics_owned_genres():
                 GROUP BY genre_primary
                 ORDER BY count DESC
                 LIMIT 12;
-            ''', (appids,))
+            ''', (appids_str,))
             rows = cur.fetchall()
         conn.close()
         return jsonify(rows)

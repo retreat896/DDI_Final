@@ -228,6 +228,8 @@ app.post('/api/analytics/owned-genres', async (c) => {
       return Response.json([]);
     }
 
+    const appidsStr = appids.map(String);
+
     const { results } = await c.env.DB.prepare(`
       SELECT genre_primary AS genre, COUNT(*) AS count
       FROM game_analytics
@@ -237,7 +239,7 @@ app.post('/api/analytics/owned-genres', async (c) => {
       GROUP BY genre_primary
       ORDER BY count DESC
       LIMIT 12;
-    `).bind(JSON.stringify(appids)).all();
+    `).bind(JSON.stringify(appidsStr)).all();
     return Response.json(results);
   } catch (e) {
     console.error('analytics/owned-genres:', e);
