@@ -55,7 +55,7 @@ function StatsCards({ games, player }) {
     {
       label: 'Avg per Game',
       value: `${avgHours.toFixed(1)}h`,
-      sub: 'hours per played game',
+      sub: 'hours per owned game',
       icon: '📊',
       color: '#10b981',
     },
