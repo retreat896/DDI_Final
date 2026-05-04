@@ -163,6 +163,16 @@ function Dashboard() {
     navigate('/');
   };
 
+  const handleSwapProfiles = () => {
+    if (!comparedPlayer) return;
+    const tempPlayer = player;
+    const tempGames = games;
+    setPlayer(comparedPlayer);
+    setGames(comparedGames);
+    setComparedPlayer(tempPlayer);
+    setComparedGames(tempGames);
+  };
+
   const handleGameClick = (appid) =>
     window.open(`https://store.steampowered.com/app/${appid}`, '_blank');
 
@@ -289,10 +299,19 @@ function Dashboard() {
                     )}
                   </div>
                 </div>
-                <button className="btn-primary" onClick={() => { setComparedPlayer(null); setComparedGames(null); setCompareInput(''); }} style={{
-                  background: 'transparent', border: '1px solid rgba(245,158,11,0.3)', color: '#f59e0b',
-                  padding: '8px 18px', fontSize: '0.9rem',
-                }}>Remove</button>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button className="btn-primary" onClick={handleSwapProfiles} style={{
+                    background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.3)', color: '#60a5fa',
+                    padding: '8px 18px', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.4rem'
+                  }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/></svg>
+                    Swap
+                  </button>
+                  <button className="btn-primary" onClick={() => { setComparedPlayer(null); setComparedGames(null); setCompareInput(''); }} style={{
+                    background: 'transparent', border: '1px solid rgba(245,158,11,0.3)', color: '#f59e0b',
+                    padding: '8px 18px', fontSize: '0.9rem',
+                  }}>Remove</button>
+                </div>
               </div>
             )}
           </div>

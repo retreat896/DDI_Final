@@ -12,8 +12,9 @@ function PlaytimeDonutChart({ games }) {
 
     const sortedGames = games.filter(g => g.playtime_forever > 0).sort((a, b) => b.playtime_forever - a.playtime_forever);
 
-    const startIndex = depth * 8;
-    const endIndex = startIndex + 8;
+    const ITEMS_PER_PAGE = 15;
+    const startIndex = depth * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
 
     const data = sortedGames.slice(startIndex, endIndex).map(g => ({ name: g.name, hours: g.playtime_forever / 60 }));
 
@@ -57,7 +58,11 @@ function PlaytimeDonutChart({ games }) {
     svg.attr('width', svgW).attr('height', svgH);
     g.attr('transform', `translate(${donutSize / 2}, ${donutSize / 2})`);
 
-    const standardColors = ['#3b82f6','#8b5cf6','#06b6d4','#10b981','#f59e0b','#ef4444','#ec4899','#84cc16'];
+    const standardColors = [
+      '#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', 
+      '#ec4899', '#84cc16', '#6366f1', '#14b8a6', '#a855f7', '#f43f5e', 
+      '#f97316', '#eab308', '#22c55e'
+    ];
     const getColor = (d, i) => d.data.name === 'Others' ? '#64748b' : standardColors[i % standardColors.length];
 
     const pie = d3.pie().value(d => d.hours).sort(null);
@@ -155,12 +160,17 @@ function PlaytimeDonutChart({ games }) {
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 480;
   
   const sortedGames = games ? games.filter(g => g.playtime_forever > 0).sort((a, b) => b.playtime_forever - a.playtime_forever) : [];
-  const startIndex = depth * 8;
-  const endIndex = startIndex + 8;
+  const ITEMS_PER_PAGE = 15;
+  const startIndex = depth * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
   const legendData = sortedGames.slice(startIndex, endIndex);
   const others = sortedGames.slice(endIndex).reduce((acc, g) => acc + g.playtime_forever / 60, 0);
   
-  const standardColors = ['#3b82f6','#8b5cf6','#06b6d4','#10b981','#f59e0b','#ef4444','#ec4899','#84cc16'];
+  const standardColors = [
+    '#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', 
+    '#ec4899', '#84cc16', '#6366f1', '#14b8a6', '#a855f7', '#f43f5e', 
+    '#f97316', '#eab308', '#22c55e'
+  ];
 
   return (
     <div ref={wrapRef} style={{ width: '100%', position: 'relative' }}>
