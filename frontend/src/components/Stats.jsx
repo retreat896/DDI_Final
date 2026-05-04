@@ -85,19 +85,25 @@ function Stats() {
   const [compareError, setCompareError] = useState('');
   const [compareInput, setCompareInput] = useState('');
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:5000';
   const { steamApiEnabled } = useServerConfig();
 
 
-  // ─── Primary Player Effect ───
+  // Extract params so they can be used as real dependency values
+  const primarySteamid   = searchParams.get('steamid');
+  const primaryProfile   = searchParams.get('user_profile');
+  const comparedSteamid  = searchParams.get('compared_steamid');
+  const comparedProfile  = searchParams.get('compared_profile');
+  const isGuestParam     = searchParams.get('guest');
+
+  // ─── Primary Player Effect ───────────────────────────────────────────────
   useEffect(() => {
-    const steamid = searchParams.get('steamid');
-    const guest = searchParams.get('guest') === 'true';
+    const guest = isGuestParam === 'true';
 
-    if (!steamid && !guest) { navigate('/'); return; }
+    if (!primarySteamid && !guest) { navigate('/'); return; }
 
-    if (guest && !steamid) {
+    if (guest && !primarySteamid) {
       setIsGuest(true);
       setLoading(false);
       return;
@@ -105,15 +111,14 @@ function Stats() {
 
     const fetchPrimaryData = async () => {
       try {
-        const paramProfile = searchParams.get('user_profile');
-        if (paramProfile) {
-          try { setPlayer(JSON.parse(decodeURIComponent(paramProfile))); }
-          catch (e) { setPlayer({ steam_id: steamid }); }
+        if (primaryProfile) {
+          try { setPlayer(JSON.parse(primaryProfile)); }
+          catch { try { setPlayer(JSON.parse(decodeURIComponent(primaryProfile))); } catch { setPlayer({ steam_id: primarySteamid }); } }
         } else {
-          setPlayer({ steam_id: steamid });
+          setPlayer({ steam_id: primarySteamid });
         }
 
-        const gamesRes = await axios.get(`${API_BASE}/api/games/${steamid}`);
+        const gamesRes = await axios.get(`${API_BASE}/api/games/${primarySteamid}`);
         if (gamesRes.data.response?.games) setGames(gamesRes.data.response.games);
       } catch {
         setError('Failed to load profile data. Check that the backend is running.');
@@ -123,12 +128,14 @@ function Stats() {
     };
 
     fetchPrimaryData();
-  }, [searchParams.get('steamid'), searchParams.get('guest'), navigate, API_BASE]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [primarySteamid, isGuestParam]);
 
-  // ─── Compared Player Effect ───
+  // ─── Compared Player Effect ──────────────────────────────────────────────
   useEffect(() => {
-    const compSteamid = searchParams.get('compared_steamid');
-    if (!compSteamid) {
+    console.log('[Compare Effect] fired. comparedSteamid:', comparedSteamid, '| comparedProfile:', comparedProfile);
+    if (!comparedSteamid) {
+      console.log('[Compare Effect] No comparedSteamid — clearing state.');
       setComparedPlayer(null);
       setComparedGames(null);
       return;
@@ -136,18 +143,38 @@ function Stats() {
 
     const fetchComparedData = async () => {
       setCompareLoading(true);
+      setCompareError('');
       try {
-        const paramCompProfile = searchParams.get('compared_profile');
-        if (paramCompProfile) {
-          try { setComparedPlayer(JSON.parse(decodeURIComponent(paramCompProfile))); }
-          catch (e) { setComparedPlayer({ steam_id: compSteamid }); }
+        // Set profile metadata from URL param immediately
+        if (comparedProfile) {
+          try {
+            const parsed = JSON.parse(comparedProfile);
+            console.log('[Compare Effect] Parsed comparedProfile:', parsed);
+            setComparedPlayer(parsed);
+          } catch (e1) {
+            console.warn('[Compare Effect] Direct parse failed, trying decode...', e1);
+            try {
+              const parsed = JSON.parse(decodeURIComponent(comparedProfile));
+              console.log('[Compare Effect] Decoded+parsed comparedProfile:', parsed);
+              setComparedPlayer(parsed);
+            } catch (e2) {
+              console.error('[Compare Effect] Both parse attempts failed:', e2);
+              setComparedPlayer({ steam_id: comparedSteamid });
+            }
+          }
         } else {
-          setComparedPlayer({ steam_id: compSteamid });
+          console.log('[Compare Effect] No comparedProfile param — using bare steamid.');
+          setComparedPlayer({ steam_id: comparedSteamid });
         }
 
-        const compGamesRes = await axios.get(`${API_BASE}/api/games/${compSteamid}`);
-        if (compGamesRes.data.response?.games) setComparedGames(compGamesRes.data.response.games);
-      } catch {
+        console.log(`[Compare Effect] Fetching games for ${comparedSteamid}...`);
+        const compGamesRes = await axios.get(`${API_BASE}/api/games/${comparedSteamid}`);
+        console.log('[Compare Effect] Raw games response:', compGamesRes.data);
+        const games = compGamesRes.data?.response?.games || [];
+        console.log(`[Compare Effect] Games count: ${games.length}`);
+        setComparedGames(games);
+      } catch (err) {
+        console.error('[Compare Effect] Fetch error:', err);
         setCompareError('Failed to load compared profile data.');
       } finally {
         setCompareLoading(false);
@@ -155,7 +182,8 @@ function Stats() {
     };
 
     fetchComparedData();
-  }, [searchParams.get('compared_steamid'), searchParams.get('compared_profile'), API_BASE]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [comparedSteamid, comparedProfile]);
 
   const handleCompareLookup = async (e) => {
     e.preventDefault();
@@ -163,22 +191,27 @@ function Stats() {
     setCompareError('');
     setCompareLoading(true);
     try {
+      console.log('[Compare Lookup] Resolving:', compareInput.trim());
       const resolveRes = await axios.post(`${API_BASE}/api/auth/resolve`, { input: compareInput.trim() });
+      console.log('[Compare Lookup] Resolve response:', resolveRes.data);
       const { steamid, persona_name, avatar_url, profile_url } = resolveRes.data;
       if (!steamid) {
+        console.warn('[Compare Lookup] No steamid in response.');
         setCompareError('Could not resolve that Steam profile.');
         setCompareLoading(false);
         return;
       }
-      
+
+      const profileStr = JSON.stringify({ steam_id: steamid, persona_name: persona_name || steamid, avatar_url, profile_url });
+      console.log('[Compare Lookup] Setting URL params — compared_steamid:', steamid, '| compared_profile:', profileStr);
       const newParams = new URLSearchParams(searchParams);
       newParams.set('compared_steamid', steamid);
-      const profileStr = encodeURIComponent(JSON.stringify({ steam_id: steamid, persona_name: persona_name || steamid, avatar_url, profile_url }));
       newParams.set('compared_profile', profileStr);
       setSearchParams(newParams);
       setCompareInput('');
-      // The useEffect will handle the fetching automatically.
+      // compareLoading will be reset by the effect's finally block
     } catch (err) {
+      console.error('[Compare Lookup] Error:', err);
       setCompareError(err.response?.data?.error || 'Failed to load profile.');
       setCompareLoading(false);
     }
