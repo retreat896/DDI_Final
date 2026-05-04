@@ -358,7 +358,7 @@ function Dashboard() {
               {personalTab === 'overview' && (
                 <>
                   <p style={{ color: '#64748b', fontSize: '0.8rem', margin: '0 0 0.75rem' }}>
-                    Click a bar to open the game on the Steam Store.
+                    Click (or double tap on mobile) a bar to open the game on the Steam Store.
                   </p>
                   {games.length > 0
                     ? <PlaytimeBarChart games={games} onGameClick={handleGameClick} />

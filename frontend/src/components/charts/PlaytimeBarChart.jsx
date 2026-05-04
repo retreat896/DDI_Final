@@ -98,7 +98,12 @@ function PlaytimeBarChart({ games, onGameClick }) {
       .attr('y', height).attr('height', 0)
       .attr('fill', (d, i) => `url(#pb-grad-${i % colors.length})`).attr('rx', 4)
       .style('cursor', onGameClick ? 'pointer' : 'default')
-      .on('click', (event, d) => { if (onGameClick) onGameClick(d.appid); })
+      .on('click', (event, d) => { 
+        if (!isMobile && onGameClick) onGameClick(d.appid); 
+      })
+      .on('dblclick', (event, d) => {
+        if (isMobile && onGameClick) onGameClick(d.appid);
+      })
       .on('mouseover', function(event, d) {
         d3.select(this).attr('opacity', 0.85);
         tip.style('opacity',1).html(`<strong>${d.name}</strong><br/>${d.hours}h played`);

@@ -56,7 +56,7 @@ function GenreBreakdownChart() {
       .call(d3.axisBottom(x).ticks(5))
       .selectAll('text').style('fill', '#94a3b8');
 
-    const colorScale = d3.scaleSequential(d3.interpolateCool).domain([0, data.length]);
+    const colorScale = d3.scaleSequential(d3.interpolateRainbow).domain([0, data.length]);
 
     const tooltipSelection = d3.select('body').select('.d3-genre-tooltip');
     const tooltip = tooltipSelection.empty()

@@ -68,15 +68,29 @@ function ReleaseYearChart() {
       .call(d3.axisLeft(y).ticks(5).tickFormat(d => d >= 1000 ? `${(d/1000).toFixed(1)}k` : d))
       .selectAll('text').style('fill', '#94a3b8');
 
-    // Gradient definition for the area
+    // Gradient definition for the area and line
     const defs = svg.append("defs");
-    const gradient = defs.append("linearGradient")
+    const areaGradient = defs.append("linearGradient")
       .attr("id", "area-gradient")
-      .attr("x1", "0%").attr("y1", "0%")
-      .attr("x2", "0%").attr("y2", "100%");
-    
-    gradient.append("stop").attr("offset", "0%").attr("stop-color", "rgba(59,130,246,0.6)");
-    gradient.append("stop").attr("offset", "100%").attr("stop-color", "rgba(59,130,246,0.0)");
+      .attr("gradientUnits", "userSpaceOnUse")
+      .attr("x1", "0").attr("y1", "0")
+      .attr("x2", "0").attr("y2", height);
+      
+    const lineGradient = defs.append("linearGradient")
+      .attr("id", "line-gradient")
+      .attr("gradientUnits", "userSpaceOnUse")
+      .attr("x1", "0").attr("y1", "0")
+      .attr("x2", "0").attr("y2", height);
+
+    const numStops = 10;
+    const colorInterpolator = d3.interpolate('#3b82f6', '#22c55e');
+    for (let i = 0; i <= numStops; i++) {
+        const offset = `${(i / numStops) * 100}%`;
+        const ratio = 1 - (i / numStops); // 1 at top (green), 0 at bottom (blue)
+        const color = colorInterpolator(ratio);
+        areaGradient.append("stop").attr("offset", offset).attr("stop-color", color).attr("stop-opacity", 0.3);
+        lineGradient.append("stop").attr("offset", offset).attr("stop-color", color);
+    }
 
     // Area Generator
     const area = d3.area()
@@ -103,7 +117,7 @@ function ReleaseYearChart() {
     const path = svg.append("path")
       .datum(data)
       .attr("fill", "none")
-      .attr("stroke", "#3b82f6")
+      .attr("stroke", "url(#line-gradient)")
       .attr("stroke-width", 3)
       .attr("d", line);
       
@@ -123,6 +137,10 @@ function ReleaseYearChart() {
       ? d3.select('body').append('div').attr('class', 'd3-tooltip d3-release-tooltip').style('opacity', 0)
       : tooltipSelection;
 
+    const maxCount = d3.max(data, d => parseInt(d.count));
+    const colorInterpolator2 = d3.interpolate('#3b82f6', '#22c55e');
+    const getColor = (count) => colorInterpolator2(count / maxCount);
+
     // Dots
     svg.selectAll(".dot")
       .data(data)
@@ -132,11 +150,11 @@ function ReleaseYearChart() {
       .attr("cy", d => y(parseInt(d.count)))
       .attr("r", 4)
       .attr("fill", "#0f172a")
-      .attr("stroke", "#60a5fa")
+      .attr("stroke", d => getColor(parseInt(d.count)))
       .attr("stroke-width", 2)
       .attr("opacity", 0)
       .on('mouseover', function (event, d) {
-        d3.select(this).attr('r', 6).attr('fill', '#60a5fa');
+        d3.select(this).attr('r', 6).attr('fill', getColor(parseInt(d.count)));
         tooltip.style('opacity', 1);
         tooltip.html(`<strong>${d.year}</strong><br/>${parseInt(d.count).toLocaleString()} games`)
           positionTooltip(tooltip, event);

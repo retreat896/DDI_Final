@@ -91,15 +91,16 @@ function PriceDistributionChart() {
     const defs = svg.append('defs');
     const areaGrad = defs.append('linearGradient').attr('id', 'pm-area-grad')
       .attr('x1','0%').attr('y1','0%').attr('x2','100%').attr('y2','0%');
-    areaGrad.append('stop').attr('offset','0%') .attr('stop-color','rgba(59,130,246,0.3)');
-    areaGrad.append('stop').attr('offset','50%') .attr('stop-color','rgba(139,92,246,0.3)');
-    areaGrad.append('stop').attr('offset','100%').attr('stop-color','rgba(236,72,153,0.3)');
-    
     const lineGrad = defs.append('linearGradient').attr('id', 'pm-line-grad')
       .attr('x1','0%').attr('y1','0%').attr('x2','100%').attr('y2','0%');
-    lineGrad.append('stop').attr('offset','0%').attr('stop-color','#3b82f6');
-    lineGrad.append('stop').attr('offset','50%').attr('stop-color','#8b5cf6');
-    lineGrad.append('stop').attr('offset','100%').attr('stop-color','#ec4899');
+
+    const numStops = 10;
+    for (let i = 0; i <= numStops; i++) {
+      const offset = `${(i / numStops) * 100}%`;
+      const color = d3.interpolateRainbow(i / numStops);
+      areaGrad.append('stop').attr('offset', offset).attr('stop-color', color).attr('stop-opacity', 0.3);
+      lineGrad.append('stop').attr('offset', offset).attr('stop-color', color);
+    }
     const glow = defs.append('filter').attr('id','pm-glow');
     glow.append('feGaussianBlur').attr('stdDeviation','3').attr('result','coloredBlur');
     const merge = glow.append('feMerge');
@@ -211,11 +212,26 @@ function PriceDistributionChart() {
     const y = d3.scaleLinear()
       .domain([0, d3.max(data, d => +d.count) * 1.1]).range([height, 0]);
 
+    // Defs for context chart
+    const defs = svg.append('defs');
+    const ctxAreaGrad = defs.append('linearGradient').attr('id', 'ctx-area-grad')
+      .attr('x1','0%').attr('y1','0%').attr('x2','100%').attr('y2','0%');
+    const ctxLineGrad = defs.append('linearGradient').attr('id', 'ctx-line-grad')
+      .attr('x1','0%').attr('y1','0%').attr('x2','100%').attr('y2','0%');
+      
+    const numStops = 10;
+    for (let i = 0; i <= numStops; i++) {
+      const offset = `${(i / numStops) * 100}%`;
+      const color = d3.interpolateRainbow(i / numStops);
+      ctxAreaGrad.append('stop').attr('offset', offset).attr('stop-color', color).attr('stop-opacity', 0.2);
+      ctxLineGrad.append('stop').attr('offset', offset).attr('stop-color', color).attr('stop-opacity', 0.5);
+    }
+
     // Mini area
     const areaGen = d3.area()
       .x(d => x(d.bucket)).y0(height).y1(d => y(+d.count)).curve(d3.curveMonotoneX);
     svg.append('path').datum(data)
-      .attr('fill','rgba(59,130,246,0.2)').attr('stroke','rgba(59,130,246,0.5)')
+      .attr('fill','url(#ctx-area-grad)').attr('stroke','url(#ctx-line-grad)')
       .attr('stroke-width', 1.5).attr('d', areaGen);
 
     // X axis (tick labels only)
