@@ -1,5 +1,5 @@
 import { Routes, Route, useLocation } from 'react-router-dom';
-import Dashboard from './components/Dashboard';
+import Stats from './components/Stats';
 import SteamLogin from './components/SteamLogin';
 import LegalAndCompliance from './components/LegalAndCompliance';
 import Footer from './components/Footer';
@@ -21,7 +21,7 @@ function App() {
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<SteamLogin />} />
-          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/stats" element={<Stats />} />
           <Route path="/legal" element={<LegalAndCompliance />} />
         </Routes>
       </main>

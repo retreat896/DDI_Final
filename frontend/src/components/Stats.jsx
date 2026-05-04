@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { useServerConfig } from '../hooks/useServerConfig';
 
@@ -71,7 +71,7 @@ function SectionHeader({ title, subtitle }) {
 }
 
 // ─── Main Dashboard ──────────────────────────────────────────────────────────
-function Dashboard() {
+function Stats() {
   const [player, setPlayer] = useState(null);
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -85,15 +85,16 @@ function Dashboard() {
   const [compareError, setCompareError] = useState('');
   const [compareInput, setCompareInput] = useState('');
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:5000';
   const { steamApiEnabled } = useServerConfig();
 
 
+  // ─── Primary Player Effect ───
   useEffect(() => {
-    const steamid = localStorage.getItem('steamid');
-    const guest = localStorage.getItem('guest') === 'true';
+    const steamid = searchParams.get('steamid');
+    const guest = searchParams.get('guest') === 'true';
 
-    // Redirect only if neither authenticated nor a guest
     if (!steamid && !guest) { navigate('/'); return; }
 
     if (guest && !steamid) {
@@ -102,18 +103,11 @@ function Dashboard() {
       return;
     }
 
-    const fetchData = async () => {
+    const fetchPrimaryData = async () => {
       try {
-        const getCookie = (name) => {
-          const value = `; ${document.cookie}`;
-          const parts = value.split(`; ${name}=`);
-          if (parts.length === 2) return parts.pop().split(';').shift();
-          return null;
-        };
-
-        const cookieProfile = getCookie('user_profile');
-        if (cookieProfile) {
-          try { setPlayer(JSON.parse(decodeURIComponent(cookieProfile))); }
+        const paramProfile = searchParams.get('user_profile');
+        if (paramProfile) {
+          try { setPlayer(JSON.parse(decodeURIComponent(paramProfile))); }
           catch (e) { setPlayer({ steam_id: steamid }); }
         } else {
           setPlayer({ steam_id: steamid });
@@ -128,8 +122,40 @@ function Dashboard() {
       }
     };
 
-    fetchData();
-  }, [navigate, API_BASE]);
+    fetchPrimaryData();
+  }, [searchParams.get('steamid'), searchParams.get('guest'), navigate, API_BASE]);
+
+  // ─── Compared Player Effect ───
+  useEffect(() => {
+    const compSteamid = searchParams.get('compared_steamid');
+    if (!compSteamid) {
+      setComparedPlayer(null);
+      setComparedGames(null);
+      return;
+    }
+
+    const fetchComparedData = async () => {
+      setCompareLoading(true);
+      try {
+        const paramCompProfile = searchParams.get('compared_profile');
+        if (paramCompProfile) {
+          try { setComparedPlayer(JSON.parse(decodeURIComponent(paramCompProfile))); }
+          catch (e) { setComparedPlayer({ steam_id: compSteamid }); }
+        } else {
+          setComparedPlayer({ steam_id: compSteamid });
+        }
+
+        const compGamesRes = await axios.get(`${API_BASE}/api/games/${compSteamid}`);
+        if (compGamesRes.data.response?.games) setComparedGames(compGamesRes.data.response.games);
+      } catch {
+        setCompareError('Failed to load compared profile data.');
+      } finally {
+        setCompareLoading(false);
+      }
+    };
+
+    fetchComparedData();
+  }, [searchParams.get('compared_steamid'), searchParams.get('compared_profile'), API_BASE]);
 
   const handleCompareLookup = async (e) => {
     e.preventDefault();
@@ -144,33 +170,59 @@ function Dashboard() {
         setCompareLoading(false);
         return;
       }
-      const gamesRes = await axios.get(`${API_BASE}/api/games/${steamid}`);
-      const games = gamesRes.data?.response?.games || [];
-      setComparedGames(games);
-      setComparedPlayer({ steam_id: steamid, persona_name: persona_name || steamid, avatar_url, profile_url });
+      
+      const newParams = new URLSearchParams(searchParams);
+      newParams.set('compared_steamid', steamid);
+      const profileStr = encodeURIComponent(JSON.stringify({ steam_id: steamid, persona_name: persona_name || steamid, avatar_url, profile_url }));
+      newParams.set('compared_profile', profileStr);
+      setSearchParams(newParams);
+      setCompareInput('');
+      // The useEffect will handle the fetching automatically.
     } catch (err) {
       setCompareError(err.response?.data?.error || 'Failed to load profile.');
-    } finally {
       setCompareLoading(false);
     }
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('steamid');
-    localStorage.removeItem('guest');
-    document.cookie = 'steamid=; Max-Age=0; path=/;';
-    document.cookie = 'user_profile=; Max-Age=0; path=/;';
     navigate('/');
   };
 
   const handleSwapProfiles = () => {
-    if (!comparedPlayer) return;
+    if (!comparedPlayer || !player) return;
+    const newParams = new URLSearchParams(searchParams);
+    
+    // Swap steamid
+    newParams.set('steamid', comparedPlayer.steam_id || comparedPlayer.steamid);
+    newParams.set('compared_steamid', player.steam_id || player.steamid);
+    
+    // Swap profiles
+    const compProfileStr = searchParams.get('compared_profile');
+    const primaryProfileStr = searchParams.get('user_profile');
+    
+    if (compProfileStr) newParams.set('user_profile', compProfileStr);
+    else newParams.delete('user_profile');
+    
+    if (primaryProfileStr) newParams.set('compared_profile', primaryProfileStr);
+    else newParams.delete('compared_profile');
+    
+    setSearchParams(newParams);
+    
+    // Swap local state immediately for a snappy UI
     const tempPlayer = player;
     const tempGames = games;
     setPlayer(comparedPlayer);
     setGames(comparedGames);
     setComparedPlayer(tempPlayer);
     setComparedGames(tempGames);
+  };
+
+  const handleRemoveComparedPlayer = () => {
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete('compared_steamid');
+    newParams.delete('compared_profile');
+    setSearchParams(newParams);
+    setCompareInput('');
   };
 
   const handleGameClick = (appid) =>
@@ -307,7 +359,7 @@ function Dashboard() {
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/></svg>
                     Swap
                   </button>
-                  <button className="btn-primary" onClick={() => { setComparedPlayer(null); setComparedGames(null); setCompareInput(''); }} style={{
+                  <button className="btn-primary" onClick={handleRemoveComparedPlayer} style={{
                     background: 'transparent', border: '1px solid rgba(245,158,11,0.3)', color: '#f59e0b',
                     padding: '8px 18px', fontSize: '0.9rem',
                   }}>Remove</button>
@@ -342,18 +394,6 @@ function Dashboard() {
             position: 'relative',
             overflow: 'hidden'
           }}>
-            <img 
-              src="/placeholder.png" 
-              alt="Analytics Locked"
-              style={{
-                width: '100%',
-                maxWidth: '600px',
-                borderRadius: '8px',
-                marginBottom: '1.5rem',
-                opacity: 0.8,
-                mixBlendMode: 'screen'
-              }}
-            />
             <div style={{ position: 'relative', zIndex: 1 }}>
               <h3 style={{ marginBottom: '0.5rem', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>Personal Library Analytics</h3>
               <p style={{ color: '#94a3b8', maxWidth: '380px', margin: '0 auto 1.5rem', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
@@ -565,4 +605,4 @@ function Dashboard() {
   );
 }
 
-export default Dashboard;
+export default Stats;

@@ -111,16 +111,15 @@ def auth_callback():
                             "avatar_url": p.get('avatarfull')
                         }
 
-            # Redirect back to frontend and set cookies
+            # Redirect back to frontend with URL parameters
             import json
-            from flask import make_response
-            resp = redirect(f"{FRONTEND_URL}/login")
-            resp.set_cookie('steamid', steam_id, max_age=86400*30, httponly=False, samesite='Lax')
             if profile_data:
                 profile_json = json.dumps(profile_data)
-                resp.set_cookie('user_profile', urllib.parse.quote(profile_json), max_age=86400*30, httponly=False, samesite='Lax')
-            return resp
-    return redirect(f"{FRONTEND_URL}/login?error=authentication_failed")
+                redirect_url = f"{FRONTEND_URL}/stats?steamid={steam_id}&user_profile={urllib.parse.quote(profile_json)}"
+            else:
+                redirect_url = f"{FRONTEND_URL}/stats?steamid={steam_id}"
+            return redirect(redirect_url)
+    return redirect(f"{FRONTEND_URL}/stats?error=authentication_failed")
 
 @app.route('/api/auth/resolve', methods=['POST'])
 def resolve_steam_id():

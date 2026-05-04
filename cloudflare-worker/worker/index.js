@@ -140,17 +140,10 @@ app.get('/api/auth/callback', async (c) => {
     ? await fetchProfile(steamId, env.STEAM_API_KEY)
     : { steamid: steamId };
 
-  const maxAge = 86400 * 30;
-  const opts = `Max-Age=${maxAge}; Path=/; SameSite=Lax`;
+  const profileStr = encodeURIComponent(JSON.stringify(profile));
+  const redirectUrl = `${frontendUrl}/stats?steamid=${steamId}&user_profile=${profileStr}`;
   
-  const headers = new Headers({ Location: `${frontendUrl}/login` });
-  headers.append('Set-Cookie', `steamid=${steamId}; ${opts}`);
-  headers.append('Set-Cookie', `user_profile=${encodeURIComponent(JSON.stringify(profile))}; ${opts}`);
-
-  return new Response(null, {
-    status: 302,
-    headers,
-  });
+  return Response.redirect(redirectUrl, 302);
 });
 
 app.post('/api/auth/resolve', async (c) => {
@@ -438,7 +431,7 @@ app.get('/api/analytics/game-features', async (c) => {
 });
 
 // ─── Export ───────────────────────────────────────────────────────────────────
-// For routes Hono doesn't handle (i.e. non-/api/* paths like /, /dashboard),
+// For routes Hono doesn't handle (i.e. non-/api/* paths like /, /stats),
 // fall through to Cloudflare's static asset service so the React SPA is served.
 export default {
   async fetch(request, env, ctx) {

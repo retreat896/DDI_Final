@@ -12,20 +12,12 @@ function SteamLogin() {
   const { steamApiEnabled, loading: configLoading } = useServerConfig();
 
   useEffect(() => {
-    const getCookie = (name) => {
-      const value = `; ${document.cookie}`;
-      const parts = value.split(`; ${name}=`);
-      if (parts.length === 2) return parts.pop().split(';').shift();
-      return null;
-    };
-    const params  = new URLSearchParams(location.search);
-    const steamid = params.get('steamid') || getCookie('steamid');
-    if (steamid) {
-      localStorage.setItem('steamid', steamid);
-      localStorage.removeItem('guest');
-      navigate('/dashboard');
+    const params = new URLSearchParams(location.search);
+    const errorMsg = params.get('error');
+    if (errorMsg === 'authentication_failed') {
+      setError('Authentication failed. Please try again.');
     }
-  }, [location, navigate]);
+  }, [location]);
 
   const handleLogin = () => {
     const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:5000';
@@ -41,11 +33,8 @@ function SteamLogin() {
       const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:5000';
       const res = await axios.post(`${API_BASE}/api/auth/resolve`, { input: inputVal });
       if (res.data.steamid) {
-        localStorage.setItem('steamid', res.data.steamid);
-        localStorage.removeItem('guest');
-        document.cookie = `steamid=${res.data.steamid}; Max-Age=${86400 * 30}; path=/; SameSite=Lax`;
-        document.cookie = `user_profile=${encodeURIComponent(JSON.stringify(res.data))}; Max-Age=${86400 * 30}; path=/; SameSite=Lax`;
-        navigate('/dashboard');
+        const profileStr = encodeURIComponent(JSON.stringify(res.data));
+        navigate(`/stats?steamid=${res.data.steamid}&user_profile=${profileStr}`);
       }
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to resolve profile. Please check the URL.');
@@ -55,9 +44,7 @@ function SteamLogin() {
   };
 
   const handleGuest = () => {
-    localStorage.setItem('guest', 'true');
-    localStorage.removeItem('steamid');
-    navigate('/dashboard');
+    navigate('/stats?guest=true');
   };
 
   return (
