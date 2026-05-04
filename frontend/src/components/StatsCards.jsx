@@ -10,7 +10,7 @@ function StatsCards({ games, player }) {
   const totalHours  = playedGames.reduce((acc, g) => acc + g.playtime_forever / 60, 0);
   const recentGames = games.filter(g => g.playtime_2weeks > 0).length;
   const recentHours = games.filter(g => g.playtime_2weeks > 0).reduce((acc, g) => acc + g.playtime_2weeks / 60, 0);
-  const avgHours    = playedGames.length > 0 ? totalHours / playedGames.length : 0;
+  const avgHours    = totalGames > 0 ? totalHours / totalGames : 0;
 
   // Account age derived from Steam's timecreated (Unix timestamp)
   const timecreated = player?.timecreated;

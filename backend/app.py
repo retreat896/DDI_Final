@@ -414,10 +414,8 @@ def analytics_user_price_distribution():
         raw_appids = data.get('appids', [])
         if not raw_appids:
             return jsonify([])
-        try:
-            appids = [int(a) for a in raw_appids]
-        except (TypeError, ValueError):
-            return jsonify({"error": "appids must be integers"}), 400
+        # Keep appids as strings to match the text appid column
+        appids = [str(a) for a in raw_appids]
         conn = get_db_connection()
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(f"""
@@ -456,7 +454,7 @@ def analytics_user_price_distribution():
                     END AS bucket,
                     COUNT(*) AS count
                 FROM "{DB_SCHEMA}"."game_analytics"
-                WHERE appid = ANY(%s::integer[])
+                WHERE appid = ANY(%s::text[])
                   AND price_final IS NOT NULL AND price_final <> ''
                 GROUP BY bucket
                 ORDER BY MIN(CAST(NULLIF(price_final,'') AS NUMERIC));

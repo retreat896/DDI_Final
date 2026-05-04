@@ -309,11 +309,14 @@ app.post('/api/analytics/user-price-distribution', async (c) => {
     const appids = body?.appids || [];
     if (!appids.length) return Response.json([]);
 
-    // D1 doesn't support array binding — chunk into batches of 100 and UNION
+    // Convert to strings to match the TEXT appid column in D1
+    const stringIds = appids.map(a => String(a));
+
+    // D1 doesn't support array binding — chunk into batches of 100
     const CHUNK = 100;
     const allResults = [];
-    for (let i = 0; i < appids.length; i += CHUNK) {
-      const chunk = appids.slice(i, i + CHUNK);
+    for (let i = 0; i < stringIds.length; i += CHUNK) {
+      const chunk = stringIds.slice(i, i + CHUNK);
       const placeholders = chunk.map(() => '?').join(',');
       const { results } = await c.env.DB.prepare(`
         SELECT
