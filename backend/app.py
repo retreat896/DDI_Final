@@ -108,16 +108,12 @@ def auth_callback():
                             "steamid": steam_id,
                             "persona_name": p.get('personaname'),
                             "profile_url": p.get('profileurl'),
-                            "avatar_url": p.get('avatarfull')
+                            "avatar_url": p.get('avatarfull'),
+                            "timecreated": p.get('timecreated')
                         }
 
-            # Redirect back to frontend with URL parameters
-            import json
-            if profile_data:
-                profile_json = json.dumps(profile_data)
-                redirect_url = f"{FRONTEND_URL}/stats?steamid={steam_id}&user_profile={urllib.parse.quote(profile_json)}"
-            else:
-                redirect_url = f"{FRONTEND_URL}/stats?steamid={steam_id}"
+            # Redirect back to frontend with only steamid in URL
+            redirect_url = f"{FRONTEND_URL}/stats?steamid={steam_id}"
             return redirect(redirect_url)
     return redirect(f"{FRONTEND_URL}/stats?error=authentication_failed")
 
@@ -198,7 +194,8 @@ def resolve_steam_id():
                         profile_data.update({
                             "persona_name": p.get('personaname'),
                             "profile_url": p.get('profileurl'),
-                            "avatar_url": p.get('avatarfull')
+                            "avatar_url": p.get('avatarfull'),
+                            "timecreated": p.get('timecreated')
                         })
             return jsonify(profile_data)
         
@@ -406,6 +403,69 @@ def analytics_price_distribution():
         return jsonify(rows)
     except Exception as e:
         print(f"Error in analytics_price_distribution: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/analytics/user-price-distribution', methods=['POST'])
+def analytics_user_price_distribution():
+    """Price bucket distribution for a user's owned games (cross-referenced with dataset)."""
+    try:
+        data = request.json or {}
+        raw_appids = data.get('appids', [])
+        if not raw_appids:
+            return jsonify([])
+        try:
+            appids = [int(a) for a in raw_appids]
+        except (TypeError, ValueError):
+            return jsonify({"error": "appids must be integers"}), 400
+        conn = get_db_connection()
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(f"""
+                SELECT
+                    CASE
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) =   0 THEN 'Free'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <   1 THEN 'Under $1'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <   2 THEN '$1'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <   3 THEN '$2'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <   4 THEN '$3'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <   5 THEN '$4'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <   6 THEN '$5'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <   7 THEN '$6'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <   8 THEN '$7'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <   9 THEN '$8'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <  10 THEN '$9'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <  11 THEN '$10'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <  12 THEN '$11'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <  13 THEN '$12'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <  14 THEN '$13'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <  15 THEN '$14'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <  16 THEN '$15'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <  17 THEN '$16'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <  18 THEN '$17'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <  19 THEN '$18'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <  20 THEN '$19'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <  30 THEN '$20-$29'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <  40 THEN '$30-$39'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <  50 THEN '$40-$49'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <  60 THEN '$50-$59'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <  70 THEN '$60-$69'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <  80 THEN '$70-$79'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) <  90 THEN '$80-$89'
+                        WHEN CAST(NULLIF(price_final,'') AS NUMERIC) < 100 THEN '$90-$99'
+                        ELSE '$100+'
+                    END AS bucket,
+                    COUNT(*) AS count
+                FROM "{DB_SCHEMA}"."game_analytics"
+                WHERE appid = ANY(%s::integer[])
+                  AND price_final IS NOT NULL AND price_final <> ''
+                GROUP BY bucket
+                ORDER BY MIN(CAST(NULLIF(price_final,'') AS NUMERIC));
+            """, [appids])
+            rows = cur.fetchall()
+        conn.close()
+        return jsonify(rows)
+    except Exception as e:
+        print(f"Error in analytics_user_price_distribution: {e}")
         return jsonify({"error": str(e)}), 500
 
 

@@ -1,22 +1,39 @@
 /**
- * Stat summary cards: total games, total hours, recently active games, average hours/game.
+ * Stat summary cards: total games, total hours, recently active games, average hours/game,
+ * plus account creation date and profile age derived from the player profile.
  */
-function StatsCards({ games }) {
+function StatsCards({ games, player }) {
   if (!games || games.length === 0) return null;
 
-  const totalGames = games.length;
+  const totalGames  = games.length;
   const playedGames = games.filter(g => g.playtime_forever > 0);
-  const totalHours = playedGames.reduce((acc, g) => acc + g.playtime_forever / 60, 0);
+  const totalHours  = playedGames.reduce((acc, g) => acc + g.playtime_forever / 60, 0);
   const recentGames = games.filter(g => g.playtime_2weeks > 0).length;
   const recentHours = games.filter(g => g.playtime_2weeks > 0).reduce((acc, g) => acc + g.playtime_2weeks / 60, 0);
-  const avgHours = playedGames.length > 0 ? totalHours / playedGames.length : 0;
+  const avgHours    = playedGames.length > 0 ? totalHours / playedGames.length : 0;
+
+  // Account age derived from Steam's timecreated (Unix timestamp)
+  const timecreated = player?.timecreated;
+  let createdLabel = null;
+  let ageLabel     = null;
+  if (timecreated) {
+    const created    = new Date(timecreated * 1000);
+    const now        = new Date();
+    const totalDays  = Math.floor((now - created) / 86_400_000);
+    const years      = Math.floor(totalDays / 365);
+    const months     = Math.floor((totalDays % 365) / 30);
+    createdLabel = created.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    ageLabel     = years > 0
+      ? `${years}y ${months}m`
+      : `${months} months`;
+  }
 
   const cards = [
     {
       label: 'Games Owned',
       value: totalGames.toLocaleString(),
       sub: `${playedGames.length} played`,
-      icon: '',
+      icon: '🎮',
       color: '#3b82f6',
     },
     {
@@ -25,23 +42,30 @@ function StatsCards({ games }) {
         ? `${(totalHours / 1000).toFixed(1)}k`
         : totalHours.toFixed(0),
       sub: `${(totalHours / 24).toFixed(0)} days`,
-      icon: '',
+      icon: '⏱️',
       color: '#8b5cf6',
     },
     {
       label: 'played in the last 2 weeks',
       value: `${recentHours.toFixed(1)}h`,
       sub: `across ${recentGames} different games`,
-      icon: '',
+      icon: '📅',
       color: '#f59e0b',
     },
     {
       label: 'Avg per Game',
       value: `${avgHours.toFixed(1)}h`,
       sub: 'hours per played game',
-      icon: '',
+      icon: '📊',
       color: '#10b981',
     },
+    ...(createdLabel ? [{
+      label: 'Account Created',
+      value: ageLabel,
+      sub: createdLabel,
+      icon: '🗓️',
+      color: '#ec4899',
+    }] : []),
   ];
 
   return (
@@ -75,7 +99,7 @@ function StatsCards({ games }) {
             e.currentTarget.style.boxShadow = `0 4px 24px ${card.color}18`;
           }}
         >
-          <span style={{ fontSize: '1.6rem' }}>{card.icon}</span>
+          <span style={{ fontSize: '1.4rem' }}>{card.icon}</span>
           <span style={{
             fontSize: '1.75rem',
             fontWeight: 700,

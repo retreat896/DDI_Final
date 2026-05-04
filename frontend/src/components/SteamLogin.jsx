@@ -33,8 +33,7 @@ function SteamLogin() {
       const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:5000';
       const res = await axios.post(`${API_BASE}/api/auth/resolve`, { input: inputVal });
       if (res.data.steamid) {
-        const profileStr = encodeURIComponent(JSON.stringify(res.data));
-        navigate(`/stats?steamid=${res.data.steamid}&user_profile=${profileStr}`);
+        navigate(`/stats?steamid=${res.data.steamid}`);
       }
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to resolve profile. Please check the URL.');

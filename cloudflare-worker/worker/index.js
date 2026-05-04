@@ -86,6 +86,7 @@ async function fetchProfile(steamId, apiKey) {
     persona_name: p.personaname,
     profile_url: p.profileurl,
     avatar_url: p.avatarfull,
+    timecreated: p.timecreated,
   };
 }
 
@@ -136,14 +137,8 @@ app.get('/api/auth/callback', async (c) => {
   if (!match) return Response.redirect(`${frontendUrl}?error=authentication_failed`, 302);
 
   const steamId = match[1];
-  const profile = env.STEAM_API_KEY
-    ? await fetchProfile(steamId, env.STEAM_API_KEY)
-    : { steamid: steamId };
-
-  const profileStr = encodeURIComponent(JSON.stringify(profile));
-  const redirectUrl = `${frontendUrl}/stats?steamid=${steamId}&user_profile=${profileStr}`;
-  
-  return Response.redirect(redirectUrl, 302);
+  // Redirect with only the steamid — the frontend fetches profile data via /api/auth/resolve
+  return Response.redirect(`${frontendUrl}/stats?steamid=${steamId}`, 302);
 });
 
 app.post('/api/auth/resolve', async (c) => {
@@ -303,6 +298,87 @@ app.get('/api/analytics/price-distribution', async (c) => {
     return Response.json(results);
   } catch (e) {
     console.error('analytics/price-distribution:', e);
+    return jsonErr(e.message);
+  }
+});
+
+app.post('/api/analytics/user-price-distribution', async (c) => {
+  try {
+    let body;
+    try { body = await c.req.json(); } catch { return jsonErr('Invalid JSON body', 400); }
+    const appids = body?.appids || [];
+    if (!appids.length) return Response.json([]);
+
+    // D1 doesn't support array binding — chunk into batches of 100 and UNION
+    const CHUNK = 100;
+    const allResults = [];
+    for (let i = 0; i < appids.length; i += CHUNK) {
+      const chunk = appids.slice(i, i + CHUNK);
+      const placeholders = chunk.map(() => '?').join(',');
+      const { results } = await c.env.DB.prepare(`
+        SELECT
+          CASE
+            WHEN CAST(NULLIF(price_final,'') AS REAL) =   0 THEN 'Free'
+            WHEN CAST(NULLIF(price_final,'') AS REAL) <   1 THEN 'Under $1'
+            WHEN CAST(NULLIF(price_final,'') AS REAL) <   2 THEN '$1'
+            WHEN CAST(NULLIF(price_final,'') AS REAL) <   3 THEN '$2'
+            WHEN CAST(NULLIF(price_final,'') AS REAL) <   4 THEN '$3'
+            WHEN CAST(NULLIF(price_final,'') AS REAL) <   5 THEN '$4'
+            WHEN CAST(NULLIF(price_final,'') AS REAL) <   6 THEN '$5'
+            WHEN CAST(NULLIF(price_final,'') AS REAL) <   7 THEN '$6'
+            WHEN CAST(NULLIF(price_final,'') AS REAL) <   8 THEN '$7'
+            WHEN CAST(NULLIF(price_final,'') AS REAL) <   9 THEN '$8'
+            WHEN CAST(NULLIF(price_final,'') AS REAL) <  10 THEN '$9'
+            WHEN CAST(NULLIF(price_final,'') AS REAL) <  11 THEN '$10'
+            WHEN CAST(NULLIF(price_final,'') AS REAL) <  12 THEN '$11'
+            WHEN CAST(NULLIF(price_final,'') AS REAL) <  13 THEN '$12'
+            WHEN CAST(NULLIF(price_final,'') AS REAL) <  14 THEN '$13'
+            WHEN CAST(NULLIF(price_final,'') AS REAL) <  15 THEN '$14'
+            WHEN CAST(NULLIF(price_final,'') AS REAL) <  16 THEN '$15'
+            WHEN CAST(NULLIF(price_final,'') AS REAL) <  17 THEN '$16'
+            WHEN CAST(NULLIF(price_final,'') AS REAL) <  18 THEN '$17'
+            WHEN CAST(NULLIF(price_final,'') AS REAL) <  19 THEN '$18'
+            WHEN CAST(NULLIF(price_final,'') AS REAL) <  20 THEN '$19'
+            WHEN CAST(NULLIF(price_final,'') AS REAL) <  30 THEN '$20-$29'
+            WHEN CAST(NULLIF(price_final,'') AS REAL) <  40 THEN '$30-$39'
+            WHEN CAST(NULLIF(price_final,'') AS REAL) <  50 THEN '$40-$49'
+            WHEN CAST(NULLIF(price_final,'') AS REAL) <  60 THEN '$50-$59'
+            WHEN CAST(NULLIF(price_final,'') AS REAL) <  70 THEN '$60-$69'
+            WHEN CAST(NULLIF(price_final,'') AS REAL) <  80 THEN '$70-$79'
+            WHEN CAST(NULLIF(price_final,'') AS REAL) <  90 THEN '$80-$89'
+            WHEN CAST(NULLIF(price_final,'') AS REAL) < 100 THEN '$90-$99'
+            ELSE '$100+'
+          END AS bucket,
+          COUNT(*) AS count
+        FROM game_analytics
+        WHERE appid IN (${placeholders})
+          AND price_final IS NOT NULL AND price_final <> ''
+        GROUP BY bucket
+        ORDER BY MIN(CAST(NULLIF(price_final,'') AS REAL));
+      `).bind(...chunk).all();
+      allResults.push(...results);
+    }
+
+    // Merge bucket counts across chunks
+    const merged = {};
+    for (const r of allResults) {
+      merged[r.bucket] = (merged[r.bucket] || 0) + Number(r.count);
+    }
+    const BUCKET_ORDER = [
+      'Free','Under $1','$1','$2','$3','$4','$5','$6','$7','$8','$9',
+      '$10','$11','$12','$13','$14','$15','$16','$17','$18','$19',
+      '$20-$29','$30-$39','$40-$49','$50-$59','$60-$69','$70-$79','$80-$89','$90-$99','$100+'
+    ];
+    const sorted = Object.entries(merged)
+      .map(([bucket, count]) => ({ bucket, count }))
+      .sort((a, b) => {
+        const ai = BUCKET_ORDER.indexOf(a.bucket);
+        const bi = BUCKET_ORDER.indexOf(b.bucket);
+        return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+      });
+    return Response.json(sorted);
+  } catch (e) {
+    console.error('analytics/user-price-distribution:', e);
     return jsonErr(e.message);
   }
 });
