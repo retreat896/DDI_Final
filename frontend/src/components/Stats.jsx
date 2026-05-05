@@ -498,7 +498,7 @@ function Stats() {
               />
               <div style={{ marginTop: '2rem', paddingTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.07)' }}>
                 <h4 style={{ color: '#f8fafc', marginBottom: '0.4rem', fontSize: '1rem' }}>
-                  💰 Library Price Distribution
+                  Library Price Distribution
                 </h4>
                 <p style={{ color: '#64748b', fontSize: '0.8rem', margin: '0 0 1rem' }}>
                   How each player's library is distributed across price brackets in the Steam dataset.
