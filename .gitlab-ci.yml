@@ -1,0 +1,47 @@
+stages:
+  - build
+  - package
+
+# ─── Frontend Build ───────────────────────────────────────────────────────────
+build-frontend:
+  stage: build
+  image: node:20-alpine
+  cache:
+    key: "$CI_COMMIT_REF_SLUG-npm"
+    paths:
+      - frontend/node_modules/
+  before_script:
+    - cd frontend
+    - npm ci
+  script:
+    - npm run build
+  artifacts:
+    name: frontend-dist
+    paths:
+      - frontend/dist/
+    expire_in: 1 hour
+
+# ─── Package Backend + Frontend ───────────────────────────────────────────────
+package-app:
+  stage: package
+  image: python:3.12-slim
+  needs:
+    - job: build-frontend
+      artifacts: true
+  before_script:
+    # Copy built frontend into backend/static so Flask can serve it
+    - cp -r frontend/dist backend/static
+  script:
+    - pip install -r backend/requirements.txt
+    # Smoke-check that the app module loads
+    - python -c "import flask; print('Flask', flask.__version__, '- OK')"
+  artifacts:
+    name: "ddi-final-$CI_COMMIT_SHORT_SHA"
+    paths:
+      - backend/
+    exclude:
+      # Keep the artifact lean – drop venv, cache, and test noise
+      - backend/venv/**
+      - backend/__pycache__/**
+      - backend/.env
+    expire_in: 7 days

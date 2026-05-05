@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
+import axios from 'axios';
 import { positionTooltip } from '../../utils/tooltip.js';
 
 /**
@@ -8,7 +9,28 @@ import { positionTooltip } from '../../utils/tooltip.js';
 function CompareProfilesChart({ myGames, myName, theirGames, theirName }) {
   const chartRef = useRef();
   const wrapRef  = useRef();
-  const [comparisonStats, setComparisonStats] = useState(null);
+  const [comparisonStats,  setComparisonStats]  = useState(null);
+  const [myLibValue,       setMyLibValue]       = useState(null);
+  const [theirLibValue,    setTheirLibValue]    = useState(null);
+
+  const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:5000';
+
+  // Fetch library values for both players
+  useEffect(() => {
+    if (!myGames || myGames.length === 0) return;
+    const appids = myGames.map(g => g.appid).filter(Boolean);
+    axios.post(`${API_BASE}/api/analytics/user-library-value`, { appids })
+      .then(res => setMyLibValue(res.data.total_value))
+      .catch(() => setMyLibValue(null));
+  }, [myGames]);
+
+  useEffect(() => {
+    if (!theirGames || theirGames.length === 0) { setTheirLibValue(null); return; }
+    const appids = theirGames.map(g => g.appid).filter(Boolean);
+    axios.post(`${API_BASE}/api/analytics/user-library-value`, { appids })
+      .then(res => setTheirLibValue(res.data.total_value))
+      .catch(() => setTheirLibValue(null));
+  }, [theirGames]);
 
   useEffect(() => {
     if (!myGames || myGames.length === 0 || !theirGames || theirGames.length === 0) {
@@ -16,12 +38,11 @@ function CompareProfilesChart({ myGames, myName, theirGames, theirName }) {
       return;
     }
 
-    // Calculate comparison stats
     const myStats = {
-      totalPlaytime: myGames.reduce((sum, g) => sum + (g.playtime_forever || 0), 0) / 60, // hours
-      recentPlaytime: myGames.reduce((sum, g) => sum + (g.playtime_2weeks || 0), 0) / 60, // hours
+      totalPlaytime: myGames.reduce((sum, g) => sum + (g.playtime_forever || 0), 0) / 60,
+      recentPlaytime: myGames.reduce((sum, g) => sum + (g.playtime_2weeks || 0), 0) / 60,
       totalGames: myGames.length,
-      avgTimePerGame: myGames.length > 0 ? myGames.reduce((sum, g) => sum + (g.playtime_forever || 0), 0) / myGames.length / 60 : 0 // hours
+      avgTimePerGame: myGames.length > 0 ? myGames.reduce((sum, g) => sum + (g.playtime_forever || 0), 0) / myGames.length / 60 : 0
     };
 
     const theirStats = {
@@ -32,6 +53,7 @@ function CompareProfilesChart({ myGames, myName, theirGames, theirName }) {
     };
 
     setComparisonStats({ myStats, theirStats });
+
 
     // Build a union of top 10 games from each player
     const myTop = myGames
@@ -278,6 +300,33 @@ function CompareProfilesChart({ myGames, myName, theirGames, theirName }) {
                 </div>
               </div>
             </div>
+
+            {/* Library Value */}
+            {(myLibValue !== null || theirLibValue !== null) && (
+              <div style={{
+                background: 'rgba(30, 41, 59, 0.7)',
+                border: '1px solid rgba(244, 114, 182, 0.2)',
+                borderRadius: '12px',
+                padding: '1.5rem',
+                backdropFilter: 'blur(12px)'
+              }}>
+                <h5 style={{ color: '#94a3b8', margin: '0 0 1rem 0', fontSize: '0.9rem', fontWeight: 500 }}>Library Value</h5>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ color: '#3b82f6', fontSize: '1.5rem', fontWeight: 'bold' }}>
+                      {myLibValue !== null ? (myLibValue >= 1000 ? `$${(myLibValue/1000).toFixed(1)}k` : `$${myLibValue.toFixed(0)}`) : '—'}
+                    </div>
+                    <div style={{ color: '#64748b', fontSize: '0.8rem' }}>{myName || 'You'}</div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ color: '#f59e0b', fontSize: '1.5rem', fontWeight: 'bold' }}>
+                      {theirLibValue !== null ? (theirLibValue >= 1000 ? `$${(theirLibValue/1000).toFixed(1)}k` : `$${theirLibValue.toFixed(0)}`) : '—'}
+                    </div>
+                    <div style={{ color: '#64748b', fontSize: '0.8rem' }}>{theirName}</div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

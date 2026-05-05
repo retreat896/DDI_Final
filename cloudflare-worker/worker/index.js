@@ -387,6 +387,39 @@ app.post('/api/analytics/user-price-distribution', async (c) => {
 });
 
 
+app.post('/api/analytics/user-library-value', async (c) => {
+  try {
+    let body;
+    try { body = await c.req.json(); } catch { return jsonErr('Invalid JSON body', 400); }
+    const stringIds = (body?.appids || []).map(a => String(a));
+    if (!stringIds.length) return Response.json({ total_value: 0, matched: 0 });
+
+    const CHUNK = 100;
+    let totalValue = 0, matched = 0;
+    for (let i = 0; i < stringIds.length; i += CHUNK) {
+      const chunk = stringIds.slice(i, i + CHUNK);
+      const placeholders = chunk.map(() => '?').join(',');
+      const { results } = await c.env.DB.prepare(`
+        SELECT
+          COALESCE(SUM(CAST(NULLIF(price_final,'') AS REAL)), 0) AS total_value,
+          COUNT(*) AS matched
+        FROM game_analytics
+        WHERE appid IN (${placeholders})
+          AND price_final IS NOT NULL AND price_final <> ''
+          AND CAST(NULLIF(price_final,'') AS REAL) > 0;
+      `).bind(...chunk).all();
+      if (results[0]) {
+        totalValue += results[0].total_value || 0;
+        matched    += results[0].matched    || 0;
+      }
+    }
+    return Response.json({ total_value: totalValue, matched });
+  } catch (e) {
+    console.error('analytics/user-library-value:', e);
+    return jsonErr(e.message);
+  }
+});
+
 
 app.get('/api/analytics/publisher-tiers', async (c) => {
   try {

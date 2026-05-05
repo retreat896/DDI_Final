@@ -1,9 +1,15 @@
+import { useEffect, useState } from 'react';
+import axios from 'axios';
+
 /**
- * Stat summary cards: total games, total hours, recently active games, average hours/game,
- * plus account creation date and profile age derived from the player profile.
+ * Stat summary cards: total games, total hours, recently active, average, library value,
+ * and account creation date/age derived from the player profile.
  */
 function StatsCards({ games, player }) {
   if (!games || games.length === 0) return null;
+
+  const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:5000';
+  const [libraryValue, setLibraryValue] = useState(null);
 
   const totalGames  = games.length;
   const playedGames = games.filter(g => g.playtime_forever > 0);
@@ -11,6 +17,14 @@ function StatsCards({ games, player }) {
   const recentGames = games.filter(g => g.playtime_2weeks > 0).length;
   const recentHours = games.filter(g => g.playtime_2weeks > 0).reduce((acc, g) => acc + g.playtime_2weeks / 60, 0);
   const avgHours    = totalGames > 0 ? totalHours / totalGames : 0;
+
+  useEffect(() => {
+    if (!games || games.length === 0) return;
+    const appids = games.map(g => g.appid).filter(Boolean);
+    axios.post(`${API_BASE}/api/analytics/user-library-value`, { appids })
+      .then(res => setLibraryValue(res.data.total_value))
+      .catch(() => setLibraryValue(null));
+  }, [games]);
 
   // Account age derived from Steam's timecreated (Unix timestamp)
   const timecreated = player?.timecreated;
@@ -23,10 +37,10 @@ function StatsCards({ games, player }) {
     const years      = Math.floor(totalDays / 365);
     const months     = Math.floor((totalDays % 365) / 30);
     createdLabel = created.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
-    ageLabel     = years > 0
-      ? `${years}y ${months}m`
-      : `${months} months`;
+    ageLabel     = years > 0 ? `${years}y ${months}m` : `${months} months`;
   }
+
+  const fmtValue = v => v >= 1000 ? `$${(v / 1000).toFixed(1)}k` : `$${v.toFixed(0)}`;
 
   const cards = [
     {
@@ -38,9 +52,7 @@ function StatsCards({ games, player }) {
     },
     {
       label: 'Total Hours',
-      value: totalHours >= 1000
-        ? `${(totalHours / 1000).toFixed(1)}k`
-        : totalHours.toFixed(0),
+      value: totalHours >= 1000 ? `${(totalHours / 1000).toFixed(1)}k` : totalHours.toFixed(0),
       sub: `${(totalHours / 24).toFixed(0)} days`,
       icon: '⏱️',
       color: '#8b5cf6',
@@ -59,6 +71,13 @@ function StatsCards({ games, player }) {
       icon: '📊',
       color: '#10b981',
     },
+    ...(libraryValue !== null ? [{
+      label: 'Library Value',
+      value: fmtValue(libraryValue),
+      sub: 'estimated from dataset prices',
+      icon: '💰',
+      color: '#f472b6',
+    }] : []),
     ...(createdLabel ? [{
       label: 'Account Created',
       value: ageLabel,

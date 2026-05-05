@@ -467,6 +467,34 @@ def analytics_user_price_distribution():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/analytics/user-library-value', methods=['POST'])
+def analytics_user_library_value():
+    """Total estimated value (sum of price_final) for a user's owned games matched in the dataset."""
+    try:
+        data = request.json or {}
+        raw_appids = data.get('appids', [])
+        if not raw_appids:
+            return jsonify({'total_value': 0, 'matched': 0})
+        appids = [str(a) for a in raw_appids]
+        conn = get_db_connection()
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(f"""
+                SELECT
+                    COALESCE(SUM(CAST(NULLIF(price_final,'') AS NUMERIC)), 0) AS total_value,
+                    COUNT(*) AS matched
+                FROM "{DB_SCHEMA}"."game_analytics"
+                WHERE appid = ANY(%s::text[])
+                  AND price_final IS NOT NULL AND price_final <> ''
+                  AND CAST(NULLIF(price_final,'') AS NUMERIC) > 0;
+            """, [appids])
+            row = cur.fetchone()
+        conn.close()
+        return jsonify({'total_value': float(row['total_value']), 'matched': int(row['matched'])})
+    except Exception as e:
+        print(f"Error in analytics_user_library_value: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/analytics/publisher-tiers')
 def analytics_publisher_tiers():
     """
