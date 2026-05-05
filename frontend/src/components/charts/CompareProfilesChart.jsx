@@ -301,31 +301,7 @@ function CompareProfilesChart({ myGames, myName, theirGames, theirName }) {
               </div>
             </div>
             
-            {/* Account Age */}
-            <div style={{
-              background: 'rgba(30, 41, 59, 0.7)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              borderRadius: '12px',
-              padding: '1.5rem',
-              backdropFilter: 'blur(12px)'
-            }}>
-              <h5 style={{ color: '#94a3b8', margin: '0 0 1rem 0', fontSize: '0.9rem', fontWeight: 500 }}>Account Age</h5>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <div style={{ color: '#3b82f6', fontSize: '1.5rem', fontWeight: 'bold' }}>
-                    {comparisonStats.myStats.ageLabel.toFixed(1)}h
-                  </div>
-                  <div style={{ color: '#64748b', fontSize: '0.8rem' }}>{myName || 'You'}</div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ color: '#f59e0b', fontSize: '1.5rem', fontWeight: 'bold' }}>
-                    {comparisonStats.theirStats.ageLabel.toFixed(1)}h
-                  </div>
-                  <div style={{ color: '#64748b', fontSize: '0.8rem' }}>{theirName}</div>
-                </div>
-              </div>
-            </div>
-
+            
             {/* Library Value */}
             {(myLibValue !== null || theirLibValue !== null) && (
               <div style={{
