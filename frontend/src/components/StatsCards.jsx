@@ -93,18 +93,19 @@ function StatsCards({ games, player }) {
       gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
       gap: '1rem',
       marginBottom: '1.5rem',
+      overflowX: 'auto', // Enable horizontal scrolling
+      whiteSpace: 'nowrap', // Prevent wrapping of cards
     }}>
       {cards.map(card => (
         <div
           key={card.label}
           style={{
+            display: 'inline-block', // Ensure cards are inline for scrolling
             background: 'rgba(30,41,59,0.65)',
             border: `1px solid ${card.color}33`,
             borderRadius: '14px',
             padding: '1.25rem 1.5rem',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.25rem',
+            marginRight: '1rem', // Add spacing between cards
             transition: 'transform 0.2s ease, box-shadow 0.2s ease',
             boxShadow: `0 4px 24px ${card.color}18`,
             backdropFilter: 'blur(10px)',
