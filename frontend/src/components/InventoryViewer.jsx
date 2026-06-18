@@ -11,6 +11,45 @@ const GAMES = [
 
 const CDN_BASE = 'https://steamcommunity-a.akamaihd.net/economy/image/';
 
+const CARD_SIZES = {
+  small: {
+    gridMinWidth: '75px',
+    imgSize: '45px',
+    fontSizeName: '0.65rem',
+    heightName: '1.8rem',
+    lineHeightName: '0.9rem',
+    padding: '0.35rem',
+    badgeSize: '0.65rem',
+    amountTop: '2px',
+    amountRight: '2px',
+    amountPadding: '1px 3px',
+  },
+  medium: {
+    gridMinWidth: '95px',
+    imgSize: '60px',
+    fontSizeName: '0.72rem',
+    heightName: '2.1rem',
+    lineHeightName: '1.05rem',
+    padding: '0.5rem',
+    badgeSize: '0.68rem',
+    amountTop: '4px',
+    amountRight: '4px',
+    amountPadding: '1px 5px',
+  },
+  large: {
+    gridMinWidth: '125px',
+    imgSize: '85px',
+    fontSizeName: '0.82rem',
+    heightName: '2.5rem',
+    lineHeightName: '1.25rem',
+    padding: '0.75rem',
+    badgeSize: '0.74rem',
+    amountTop: '6px',
+    amountRight: '6px',
+    amountPadding: '2px 6px',
+  }
+};
+
 function InventoryViewer({ player, comparedPlayer }) {
   const [selectedGame, setSelectedGame] = useState(GAMES[0]);
   const [prices, setPrices] = useState(() => {
@@ -168,6 +207,9 @@ function InventoryViewer({ player, comparedPlayer }) {
   const [sortBy2, setSortBy2] = useState('default');
   const [marketFilter2, setMarketFilter2] = useState('all');
   const [tradeFilter2, setTradeFilter2] = useState('all');
+
+  const [cardSize, setCardSize] = useState('medium');
+  const [selectedItem, setSelectedItem] = useState(null);
 
   // ─── Fetch Primary Player Inventory ─────────────────────────────────────────
   useEffect(() => {
@@ -345,6 +387,7 @@ function InventoryViewer({ player, comparedPlayer }) {
 
   // Pagination bounds
   const getPaginatedItems = (items, page, size) => {
+    if (size === 'all') return items;
     const start = (page - 1) * size;
     return items.slice(start, start + size);
   };
@@ -352,11 +395,13 @@ function InventoryViewer({ player, comparedPlayer }) {
   const paginated1 = getPaginatedItems(sorted1, page1, pageSize1);
   const paginated2 = getPaginatedItems(sorted2, page2, pageSize2);
 
-  const totalPages1 = Math.ceil(sorted1.length / pageSize1);
-  const totalPages2 = Math.ceil(sorted2.length / pageSize2);
+  const totalPages1 = pageSize1 === 'all' ? 1 : Math.ceil(sorted1.length / pageSize1);
+  const totalPages2 = pageSize2 === 'all' ? 1 : Math.ceil(sorted2.length / pageSize2);
+
+  const isRateLimited = cooldownTime > 0 || requestTimestamps.length >= 20;
 
   useEffect(() => {
-    if (cooldownTime > 0 || requestTimestamps.length >= 20) return;
+    if (isRateLimited) return;
 
     const visibleItems = [
       ...paginated1.filter(item => item.marketable === 1 && !prices[item.market_hash_name]),
@@ -391,7 +436,7 @@ function InventoryViewer({ player, comparedPlayer }) {
       active = false;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paginated1, paginated2, cooldownTime]);
+  }, [paginated1, paginated2, isRateLimited]);
 
   // ─── COMPARISON ANALYSIS ───────────────────────────────────────────────────
   // 1. Overlap (Common items) - Matched by market_name
@@ -442,7 +487,7 @@ function InventoryViewer({ player, comparedPlayer }) {
 
   // Helper to render inventory grid
   const renderInventoryGrid = (
-    items, page, totalPages, setPage, 
+    items, page, setPage, 
     search, setSearch, 
     category, setCategory, categories, 
     marketFilter, setMarketFilter,
@@ -451,6 +496,9 @@ function InventoryViewer({ player, comparedPlayer }) {
     title, pName, avatar, 
     pageSize, setPageSize
   ) => {
+    const sizeConfig = CARD_SIZES[cardSize] || CARD_SIZES.medium;
+    const totalPages = pageSize === 'all' ? 1 : Math.ceil(items.length / pageSize);
+
     return (
       <div style={{ flex: 1 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
@@ -544,7 +592,7 @@ function InventoryViewer({ player, comparedPlayer }) {
           <>
             <div style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(95px, 1fr))',
+              gridTemplateColumns: `repeat(auto-fill, minmax(${sizeConfig.gridMinWidth}, 1fr))`,
               gap: '0.5rem',
               marginBottom: '1rem'
             }}>
@@ -557,11 +605,12 @@ function InventoryViewer({ player, comparedPlayer }) {
                   <div
                     key={item.key}
                     className="item-card"
+                    onClick={() => setSelectedItem(item)}
                     style={{
                       background: 'rgba(30,41,59,0.3)',
                       border: '1px solid rgba(255,255,255,0.06)',
                       borderRadius: '8px',
-                      padding: '0.5rem',
+                      padding: sizeConfig.padding,
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
@@ -583,10 +632,10 @@ function InventoryViewer({ player, comparedPlayer }) {
                     {/* Amount Badge */}
                     {item.amount > 1 && (
                       <span style={{
-                        position: 'absolute', top: '4px', right: '4px',
+                        position: 'absolute', top: sizeConfig.amountTop, right: sizeConfig.amountRight,
                         background: 'rgba(15,23,42,0.85)', border: '1px solid rgba(255,255,255,0.1)',
-                        color: 'var(--accent-color)', fontSize: '0.7rem', fontWeight: 700,
-                        padding: '1px 5px', borderRadius: '4px', zIndex: 1
+                        color: 'var(--accent-color)', fontSize: sizeConfig.badgeSize, fontWeight: 700,
+                        padding: sizeConfig.amountPadding, borderRadius: '4px', zIndex: 1
                       }}>
                         x{item.amount}
                       </span>
@@ -598,16 +647,16 @@ function InventoryViewer({ player, comparedPlayer }) {
                         alt=""
                         loading="lazy"
                         style={{
-                          width: '60px', height: '60px', objectFit: 'contain',
+                          width: sizeConfig.imgSize, height: sizeConfig.imgSize, objectFit: 'contain',
                           filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))', marginBottom: '0.4rem'
                         }}
                       />
                     ) : (
-                      <div style={{ width: '60px', height: '60px', background: 'rgba(0,0,0,0.2)', borderRadius: '4px', marginBottom: '0.4rem' }} />
+                      <div style={{ width: sizeConfig.imgSize, height: sizeConfig.imgSize, background: 'rgba(0,0,0,0.2)', borderRadius: '4px', marginBottom: '0.4rem' }} />
                     )}
 
                     <span style={{
-                      fontSize: '0.72rem',
+                      fontSize: sizeConfig.fontSizeName,
                       fontWeight: 600,
                       color,
                       overflow: 'hidden',
@@ -615,8 +664,8 @@ function InventoryViewer({ player, comparedPlayer }) {
                       display: '-webkit-box',
                       WebkitLineClamp: 2,
                       WebkitBoxOrient: 'vertical',
-                      height: '2.1rem',
-                      lineHeight: '1.05rem',
+                      height: sizeConfig.heightName,
+                      lineHeight: sizeConfig.lineHeightName,
                       width: '100%'
                     }}>
                       {item.name}
@@ -632,7 +681,7 @@ function InventoryViewer({ player, comparedPlayer }) {
                         }}
                         style={{
                           marginTop: '0.35rem',
-                          fontSize: '0.68rem',
+                          fontSize: sizeConfig.badgeSize,
                           padding: '2px 6px',
                           borderRadius: '4px',
                           background: prices[item.market_hash_name]?.loading
@@ -673,23 +722,33 @@ function InventoryViewer({ player, comparedPlayer }) {
             </div>
 
             {/* Pagination Controls */}
-            {totalPages > 1 && (
+            {items.length > 0 && (
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                <button
-                  onClick={() => setPage(p => Math.max(p - 1, 1))}
-                  disabled={page === 1}
-                  className="tab-btn"
-                  style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', opacity: page === 1 ? 0.4 : 1, cursor: page === 1 ? 'not-allowed' : 'pointer' }}
-                >
-                  ◀ Prev
-                </button>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                    Page {page} of {totalPages}
-                  </span>
+                {pageSize !== 'all' && totalPages > 1 ? (
+                  <button
+                    onClick={() => setPage(p => Math.max(p - 1, 1))}
+                    disabled={page === 1}
+                    className="tab-btn"
+                    style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', opacity: page === 1 ? 0.4 : 1, cursor: page === 1 ? 'not-allowed' : 'pointer' }}
+                  >
+                    ◀ Prev
+                  </button>
+                ) : <div style={{ width: '60px' }} />}
+                
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  {pageSize !== 'all' && totalPages > 1 && (
+                    <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                      Page {page} of {totalPages}
+                    </span>
+                  )}
+                  
                   <select
                     value={pageSize}
-                    onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setPageSize(val === 'all' ? 'all' : Number(val));
+                      setPage(1);
+                    }}
                     style={{
                       padding: '0.2rem 0.4rem', borderRadius: '4px',
                       border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(15,23,42,0.8)',
@@ -700,21 +759,283 @@ function InventoryViewer({ player, comparedPlayer }) {
                     <option value={32}>32 / page</option>
                     <option value={64}>64 / page</option>
                     <option value={128}>128 / page</option>
+                    <option value="all">Show All</option>
                   </select>
+
+                  {/* Card Size selector */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', padding: '1px 2px', background: 'rgba(15,23,42,0.5)' }}>
+                    <button
+                      onClick={() => setCardSize('small')}
+                      style={{
+                        padding: '2px 6px', fontSize: '0.65rem', border: 'none', borderRadius: '3px',
+                        background: cardSize === 'small' ? 'var(--accent-color)' : 'transparent',
+                        color: cardSize === 'small' ? '#0f172a' : '#94a3b8', cursor: 'pointer', fontWeight: 600
+                      }}
+                    >
+                      S
+                    </button>
+                    <button
+                      onClick={() => setCardSize('medium')}
+                      style={{
+                        padding: '2px 6px', fontSize: '0.65rem', border: 'none', borderRadius: '3px',
+                        background: cardSize === 'medium' ? 'var(--accent-color)' : 'transparent',
+                        color: cardSize === 'medium' ? '#0f172a' : '#94a3b8', cursor: 'pointer', fontWeight: 600
+                      }}
+                    >
+                      M
+                    </button>
+                    <button
+                      onClick={() => setCardSize('large')}
+                      style={{
+                        padding: '2px 6px', fontSize: '0.65rem', border: 'none', borderRadius: '3px',
+                        background: cardSize === 'large' ? 'var(--accent-color)' : 'transparent',
+                        color: cardSize === 'large' ? '#0f172a' : '#94a3b8', cursor: 'pointer', fontWeight: 600
+                      }}
+                    >
+                      L
+                    </button>
+                  </div>
                 </div>
-                <button
-                  onClick={() => setPage(p => Math.min(p + 1, totalPages))}
-                  disabled={page === totalPages}
-                  className="tab-btn"
-                  style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', opacity: page === totalPages ? 0.4 : 1, cursor: page === totalPages ? 'not-allowed' : 'pointer' }}
-                >
-                  Next ▶
-                </button>
+
+                {pageSize !== 'all' && totalPages > 1 ? (
+                  <button
+                    onClick={() => setPage(p => Math.min(p + 1, totalPages))}
+                    disabled={page === totalPages}
+                    className="tab-btn"
+                    style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', opacity: page === totalPages ? 0.4 : 1, cursor: page === totalPages ? 'not-allowed' : 'pointer' }}
+                  >
+                    Next ▶
+                  </button>
+                ) : <div style={{ width: '60px' }} />}
               </div>
             )}
           </>
         )}
       </div>
+    );
+  };
+
+  const renderItemInspector = () => {
+    if (!selectedItem) return null;
+
+    const item = selectedItem;
+    const nameColor = item.name_color ? `#${item.name_color}` : 'var(--accent-color)';
+    const imgUrl = item.icon_url ? `${CDN_BASE}${item.icon_url}/330x192` : '';
+    const itemType = getItemType(item);
+
+    return (
+      <>
+        {/* Backdrop Mask */}
+        <div 
+          onClick={() => setSelectedItem(null)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.4)',
+            backdropFilter: 'blur(3px)',
+            zIndex: 9998,
+          }}
+        />
+        {/* Drawer Panel */}
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            right: 0,
+            bottom: 0,
+            width: 'min(420px, 100vw)',
+            background: 'rgba(15, 23, 42, 0.95)',
+            backdropFilter: 'blur(20px)',
+            borderLeft: '1px solid rgba(255, 255, 255, 0.1)',
+            boxShadow: '-10px 0 30px rgba(0, 0, 0, 0.5)',
+            zIndex: 9999,
+            display: 'flex',
+            flexDirection: 'column',
+            padding: '1.5rem',
+            color: '#f8fafc',
+            overflowY: 'auto'
+          }}
+        >
+          {/* Drawer Header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
+            <div style={{ flex: 1, paddingRight: '1rem' }}>
+              <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8', fontWeight: 600 }}>
+                {itemType}
+              </span>
+              <h3 style={{ margin: '0.2rem 0 0 0', fontSize: '1.25rem', fontWeight: 700, color: nameColor, lineHeight: '1.4rem' }}>
+                {item.name}
+              </h3>
+            </div>
+            <button
+              onClick={() => setSelectedItem(null)}
+              style={{
+                background: 'none', border: 'none', color: '#94a3b8', fontSize: '1.5rem',
+                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(255,255,255,0.05)',
+                transition: 'background 0.2s, color 0.2s'
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; e.currentTarget.style.color = '#f8fafc'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.color = '#94a3b8'; }}
+            >
+              &times;
+            </button>
+          </div>
+
+          {/* Large Image */}
+          <div 
+            style={{ 
+              background: 'rgba(30, 41, 59, 0.4)', 
+              borderRadius: '12px', 
+              padding: '1.5rem', 
+              display: 'flex', 
+              justifyContent: 'center', 
+              alignItems: 'center',
+              marginBottom: '1.5rem',
+              border: '1px solid rgba(255, 255, 255, 0.05)'
+            }}
+          >
+            {imgUrl ? (
+              <img 
+                src={imgUrl} 
+                alt={item.name} 
+                style={{ maxWidth: '100%', maxHeight: '180px', objectFit: 'contain', filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.6))' }} 
+              />
+            ) : (
+              <div style={{ height: '150px', display: 'flex', alignItems: 'center', color: '#64748b' }}>No image available</div>
+            )}
+          </div>
+
+          {/* Details Cards */}
+          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem' }}>
+            <div style={{ flex: 1, padding: '0.6rem', borderRadius: '8px', background: 'rgba(30, 41, 59, 0.25)', border: '1px solid rgba(255,255,255,0.05)', textAlign: 'center' }}>
+              <div style={{ fontSize: '0.65rem', color: '#94a3b8', marginBottom: '0.2rem', fontWeight: 600 }}>TRADABLE</div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 600, color: item.tradable === 1 ? '#34d399' : '#f87171' }}>
+                {item.tradable === 1 ? 'Yes' : 'No'}
+              </div>
+            </div>
+            <div style={{ flex: 1, padding: '0.6rem', borderRadius: '8px', background: 'rgba(30, 41, 59, 0.25)', border: '1px solid rgba(255,255,255,0.05)', textAlign: 'center' }}>
+              <div style={{ fontSize: '0.65rem', color: '#94a3b8', marginBottom: '0.2rem', fontWeight: 600 }}>MARKETABLE</div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 600, color: item.marketable === 1 ? '#34d399' : '#f87171' }}>
+                {item.marketable === 1 ? 'Yes' : 'No'}
+              </div>
+            </div>
+            {item.amount > 1 && (
+              <div style={{ flex: 1, padding: '0.6rem', borderRadius: '8px', background: 'rgba(30, 41, 59, 0.25)', border: '1px solid rgba(255,255,255,0.05)', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.65rem', color: '#94a3b8', marginBottom: '0.2rem', fontWeight: 600 }}>QUANTITY</div>
+                <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--accent-color)' }}>
+                  {item.amount}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Pricing Info */}
+          {item.marketable === 1 && (
+            <div style={{ padding: '0.85rem 1rem', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)', marginBottom: '1.5rem' }}>
+              <h5 style={{ margin: '0 0 0.4rem 0', color: '#34d399', fontSize: '0.8rem', fontWeight: 600 }}>Market Price Status</h5>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#f8fafc' }}>
+                    {prices[item.market_hash_name]?.lowest || 'Not Loaded'}
+                  </div>
+                  <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+                    Median: {prices[item.market_hash_name]?.median || 'N/A'}
+                  </div>
+                </div>
+                <button
+                  onClick={() => fetchPrice(item.market_hash_name, selectedGame.id)}
+                  disabled={prices[item.market_hash_name]?.loading}
+                  style={{
+                    padding: '0.35rem 0.75rem', fontSize: '0.75rem', background: '#10b981', color: '#0f172a',
+                    border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: '0.25rem', opacity: prices[item.market_hash_name]?.loading ? 0.6 : 1
+                  }}
+                >
+                  {prices[item.market_hash_name]?.loading ? 'Refreshing...' : 'Refresh Price'}
+                </button>
+              </div>
+              {prices[item.market_hash_name]?.stale && (
+                <div style={{ fontSize: '0.68rem', color: '#fb923c', marginTop: '0.4rem' }}>
+                  ⚠️ Loaded from cached database (Steam API rate limited)
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Custom Descriptions (Steam-style blocks) */}
+          {item.descriptions && item.descriptions.length > 0 && (
+            <div style={{ marginBottom: '1.5rem' }}>
+              <h5 style={{ margin: '0 0 0.5rem 0', fontSize: '0.8rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Description</h5>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', background: 'rgba(30, 41, 59, 0.15)', padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.03)' }}>
+                {item.descriptions.map((desc, idx) => {
+                  if (!desc.value || desc.value.trim() === '') return null;
+                  const textColor = desc.color ? `#${desc.color}` : '#cbd5e1';
+                  return (
+                    <div 
+                      key={idx} 
+                      style={{ 
+                        fontSize: '0.75rem', 
+                        color: textColor, 
+                        whiteSpace: 'pre-line',
+                        lineHeight: '1.15rem'
+                      }}
+                      dangerouslySetInnerHTML={{ __html: desc.value }}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Tags */}
+          {item.tags && item.tags.length > 0 && (
+            <div style={{ marginBottom: '1.5rem' }}>
+              <h5 style={{ margin: '0 0 0.5rem 0', fontSize: '0.8rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Item Tags</h5>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
+                {item.tags.map((tag, idx) => {
+                  const tagColor = tag.color ? `#${tag.color}` : 'rgba(255,255,255,0.08)';
+                  return (
+                    <span
+                      key={idx}
+                      style={{
+                        fontSize: '0.65rem',
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        background: tag.color ? `${tagColor}15` : 'rgba(255,255,255,0.05)',
+                        color: tag.color ? tagColor : '#cbd5e1',
+                        border: `1px solid ${tag.color ? `${tagColor}30` : 'rgba(255,255,255,0.08)'}`
+                      }}
+                    >
+                      {tag.localized_category_name || tag.category}: {tag.localized_tag_name}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* External Links */}
+          <div style={{ marginTop: 'auto', paddingTop: '1.25rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+            <a
+              href={`https://steamcommunity.com/market/listings/${selectedGame.id}/${encodeURIComponent(item.market_hash_name)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'block', width: '100%', padding: '0.55rem', background: 'var(--accent-color)',
+                color: '#0f172a', textDecoration: 'none', borderRadius: '6px', textAlign: 'center',
+                fontWeight: 700, fontSize: '0.82rem', transition: 'filter 0.2s'
+              }}
+              onMouseEnter={e => e.currentTarget.style.filter = 'brightness(1.1)'}
+              onMouseLeave={e => e.currentTarget.style.filter = 'none'}
+            >
+              View in Steam Market ↗
+            </a>
+          </div>
+        </div>
+      </>
     );
   };
 
@@ -775,7 +1096,6 @@ function InventoryViewer({ player, comparedPlayer }) {
           renderInventoryGrid(
             sorted1,
             page1,
-            totalPages1,
             setPage1,
             search1,
             setSearch1,
@@ -1034,7 +1354,6 @@ function InventoryViewer({ player, comparedPlayer }) {
                     {renderInventoryGrid(
                       sortedExclusive1,
                       page1, // reuse page/pagination locally in rendering helper
-                      Math.ceil(sortedExclusive1.length / pageSize1),
                       setPage1,
                       search1,
                       setSearch1,
@@ -1060,7 +1379,6 @@ function InventoryViewer({ player, comparedPlayer }) {
                     {renderInventoryGrid(
                       sortedExclusive2,
                       page2,
-                      Math.ceil(sortedExclusive2.length / pageSize2),
                       setPage2,
                       search2,
                       setSearch2,
@@ -1091,6 +1409,8 @@ function InventoryViewer({ player, comparedPlayer }) {
           )}
         </div>
       )}
+
+      {renderItemInspector()}
 
     </div>
   );
