@@ -173,6 +173,29 @@ app.get('/api/games/:steamid', async (c) => {
   return Response.json(await res.json());
 });
 
+app.get('/api/inventory/:steamid', async (c) => {
+  const { steamid } = c.req.param();
+  const appid = c.req.query('appid') || '753';
+  const contextid = c.req.query('contextid') || '6';
+
+  const url = `https://steamcommunity.com/inventory/${steamid}/${appid}/${contextid}?l=english&count=1000`;
+  const res = await fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    }
+  });
+
+  if (res.status === 200) {
+    const data = await res.json();
+    return Response.json(data);
+  } else if (res.status === 429) {
+    return jsonErr('Steam inventory API rate limit exceeded. Please try again later.', 429);
+  } else if (res.status === 403) {
+    return jsonErr("This profile's inventory is private or inaccessible.", 403);
+  }
+  return jsonErr('Failed to fetch inventory from Steam', res.status);
+});
+
 // ═══════════════════════════════════════════════════════════════════════════
 //  ANALYTICS  — all read from D1 (SQLite)
 //

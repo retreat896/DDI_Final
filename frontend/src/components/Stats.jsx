@@ -23,6 +23,7 @@ import PeakCCUChart from './charts/PeakCCUChart';
 import GameFeaturesChart from './charts/GameFeaturesChart';
 
 import StatsCards from './StatsCards';
+import InventoryViewer from './InventoryViewer';
 
 // ─── Tab definitions ────────────────────────────────────────────────────────
 const PERSONAL_TABS = [
@@ -516,6 +517,12 @@ function Stats() {
               This profile has no public game data available to compare.
             </div>
           )}
+        </div>
+      )}
+
+      {steamApiEnabled && !isGuest && player && (
+        <div style={{ marginBottom: '1.5rem' }}>
+          <InventoryViewer player={player} comparedPlayer={comparedPlayer} />
         </div>
       )}
 

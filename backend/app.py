@@ -230,6 +230,53 @@ def get_games(steamid):
         return jsonify(r.json())
     return jsonify({"error": "Failed to fetch games"}), r.status_code
 
+@app.route('/api/inventory/<steamid>')
+def get_inventory(steamid):
+    """
+    Retrieve the inventory items for a specific Steam profile.
+    ---
+    parameters:
+      - name: steamid
+        in: path
+        type: string
+        required: true
+        example: "76561197960435530"
+      - name: appid
+        in: query
+        type: string
+        required: false
+        default: "753"
+      - name: contextid
+        in: query
+        type: string
+        required: false
+        default: "6"
+    responses:
+      200:
+        description: A list of inventory items.
+      403:
+        description: Inventory is private.
+      429:
+        description: Steam API rate limit exceeded.
+    """
+    appid = request.args.get('appid', '753')
+    contextid = request.args.get('contextid', '6')
+    url = f"https://steamcommunity.com/inventory/{steamid}/{appid}/{contextid}?l=english&count=1000"
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    }
+    try:
+        r = requests.get(url, headers=headers, timeout=10)
+        if r.status_code == 200:
+            return jsonify(r.json())
+        elif r.status_code == 429:
+            return jsonify({"error": "Steam inventory API rate limit exceeded. Please try again later."}), 429
+        elif r.status_code == 403:
+            return jsonify({"error": "This profile's inventory is private or inaccessible."}), 403
+        return jsonify({"error": "Failed to fetch inventory from Steam", "status_code": r.status_code}), r.status_code
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/analytics/genres')
 def analytics_genres():
     """
