@@ -13,33 +13,67 @@ const CDN_BASE = 'https://steamcommunity-a.akamaihd.net/economy/image/';
 
 function InventoryViewer({ player, comparedPlayer }) {
   const [selectedGame, setSelectedGame] = useState(GAMES[0]);
-  const [prices, setPrices] = useState({}); // market_hash_name -> { lowest, median, loading, error }
+  const [prices, setPrices] = useState(() => {
+    try {
+      const cached = localStorage.getItem('steam_item_prices');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        const now = Date.now();
+        const fresh = {};
+        let hasFresh = false;
+        Object.entries(parsed).forEach(([key, val]) => {
+          // Cache prices client-side for 30 minutes
+          if (val && now - val.cachedAt < 30 * 60 * 1000) {
+            fresh[key] = val;
+            hasFresh = true;
+          }
+        });
+        if (hasFresh) return fresh;
+      }
+    } catch (e) {
+      console.error('Failed to parse cached prices:', e);
+    }
+    return {};
+  });
   
   const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:5000';
 
   const fetchPrice = async (marketHashName, appid) => {
     setPrices(prev => ({
       ...prev,
-      [marketHashName]: { loading: true }
+      [marketHashName]: { ...prev[marketHashName], loading: true }
     }));
     try {
       const res = await axios.get(`${API_BASE}/api/market/price?appid=${appid}&market_hash_name=${encodeURIComponent(marketHashName)}`);
-      setPrices(prev => ({
-        ...prev,
-        [marketHashName]: {
-          loading: false,
-          lowest: res.data.lowest_price || res.data.median_price || 'N/A',
-          median: res.data.median_price || 'N/A'
+      setPrices(prev => {
+        const updated = {
+          ...prev,
+          [marketHashName]: {
+            loading: false,
+            lowest: res.data.lowest_price || res.data.median_price || 'N/A',
+            median: res.data.median_price || 'N/A',
+            cachedAt: Date.now()
+          }
+        };
+        try {
+          localStorage.setItem('steam_item_prices', JSON.stringify(updated));
+        } catch (e) {
+          console.error('Failed to save price to cache:', e);
         }
-      }));
+        return updated;
+      });
     } catch (err) {
-      setPrices(prev => ({
-        ...prev,
-        [marketHashName]: {
-          loading: false,
-          error: err.response?.data?.error || 'Error'
-        }
-      }));
+      setPrices(prev => {
+        const updated = {
+          ...prev,
+          [marketHashName]: {
+            loading: false,
+            error: err.response?.data?.error || 'Error',
+            cachedAt: Date.now()
+          }
+        };
+        return updated;
+      });
     }
   };
 
@@ -64,6 +98,14 @@ function InventoryViewer({ player, comparedPlayer }) {
   const [compareTab, setCompareTab] = useState('summary'); // 'summary' | 'overlap' | 'exclusive'
   const [pageSize1, setPageSize1] = useState(32);
   const [pageSize2, setPageSize2] = useState(32);
+
+  const [sortBy1, setSortBy1] = useState('default');
+  const [marketFilter1, setMarketFilter1] = useState('all');
+  const [tradeFilter1, setTradeFilter1] = useState('all');
+
+  const [sortBy2, setSortBy2] = useState('default');
+  const [marketFilter2, setMarketFilter2] = useState('all');
+  const [tradeFilter2, setTradeFilter2] = useState('all');
 
   // ─── Fetch Primary Player Inventory ─────────────────────────────────────────
   useEffect(() => {
@@ -183,17 +225,61 @@ function InventoryViewer({ player, comparedPlayer }) {
   const cats1 = getCategories(items1);
   const cats2 = getCategories(items2);
 
-  // Apply filtering (search & category)
-  const getFilteredItems = (items, search, activeCat) => {
+  // Apply filtering (search, category, marketable, tradable)
+  const getFilteredItems = (items, search, activeCat, marketFilter, tradeFilter) => {
     return items.filter((item) => {
       const matchesSearch = item.name.toLowerCase().includes(search.toLowerCase());
       const matchesCategory = activeCat === 'All' || getItemType(item) === activeCat;
-      return matchesSearch && matchesCategory;
+      const matchesMarket = 
+        marketFilter === 'all' || 
+        (marketFilter === 'marketable' && item.marketable === 1) ||
+        (marketFilter === 'unmarketable' && item.marketable !== 1);
+      const matchesTrade = 
+        tradeFilter === 'all' || 
+        (tradeFilter === 'tradable' && item.tradable === 1) ||
+        (tradeFilter === 'untradable' && item.tradable !== 1);
+      return matchesSearch && matchesCategory && matchesMarket && matchesTrade;
     });
   };
 
-  const filtered1 = getFilteredItems(items1, search1, category1);
-  const filtered2 = getFilteredItems(items2, search2, category2);
+  const parsePrice = (priceStr) => {
+    if (!priceStr || priceStr === 'N/A') return -1;
+    const cleaned = priceStr.replace(/[^0-9.]/g, '');
+    return parseFloat(cleaned) || -1;
+  };
+
+  const getSortedItems = (items, sortBy) => {
+    const list = [...items];
+    if (sortBy === 'name-asc') {
+      list.sort((a, b) => a.name.localeCompare(b.name));
+    } else if (sortBy === 'name-desc') {
+      list.sort((a, b) => b.name.localeCompare(a.name));
+    } else if (sortBy === 'qty-desc') {
+      list.sort((a, b) => b.amount - a.amount);
+    } else if (sortBy === 'qty-asc') {
+      list.sort((a, b) => a.amount - b.amount);
+    } else if (sortBy === 'price-desc' || sortBy === 'price-asc') {
+      list.sort((a, b) => {
+        const infoA = prices[a.market_hash_name];
+        const infoB = prices[b.market_hash_name];
+        const priceA = infoA && infoA.lowest ? parsePrice(infoA.lowest) : -1;
+        const priceB = infoB && infoB.lowest ? parsePrice(infoB.lowest) : -1;
+
+        if (priceA === -1 && priceB === -1) return 0;
+        if (priceA === -1) return 1; // Put unpriced items at the end
+        if (priceB === -1) return -1;
+
+        return sortBy === 'price-desc' ? priceB - priceA : priceA - priceB;
+      });
+    }
+    return list;
+  };
+
+  const filtered1 = getFilteredItems(items1, search1, category1, marketFilter1, tradeFilter1);
+  const sorted1 = getSortedItems(filtered1, sortBy1);
+
+  const filtered2 = getFilteredItems(items2, search2, category2, marketFilter2, tradeFilter2);
+  const sorted2 = getSortedItems(filtered2, sortBy2);
 
   // Pagination bounds
   const getPaginatedItems = (items, page, size) => {
@@ -201,11 +287,39 @@ function InventoryViewer({ player, comparedPlayer }) {
     return items.slice(start, start + size);
   };
 
-  const paginated1 = getPaginatedItems(filtered1, page1, pageSize1);
-  const paginated2 = getPaginatedItems(filtered2, page2, pageSize2);
+  const paginated1 = getPaginatedItems(sorted1, page1, pageSize1);
+  const paginated2 = getPaginatedItems(sorted2, page2, pageSize2);
 
-  const totalPages1 = Math.ceil(filtered1.length / pageSize1);
-  const totalPages2 = Math.ceil(filtered2.length / pageSize2);
+  const totalPages1 = Math.ceil(sorted1.length / pageSize1);
+  const totalPages2 = Math.ceil(sorted2.length / pageSize2);
+
+  useEffect(() => {
+    const visibleItems = [
+      ...paginated1.filter(item => item.marketable === 1 && !prices[item.market_hash_name]),
+      ...paginated2.filter(item => item.marketable === 1 && !prices[item.market_hash_name])
+    ];
+
+    if (visibleItems.length === 0) return;
+
+    let active = true;
+
+    const fetchSequentially = async () => {
+      for (const item of visibleItems) {
+        if (!active) break;
+        if (!prices[item.market_hash_name]) {
+          await fetchPrice(item.market_hash_name, selectedGame.id);
+          await new Promise(resolve => setTimeout(resolve, 350));
+        }
+      }
+    };
+
+    fetchSequentially();
+
+    return () => {
+      active = false;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paginated1, paginated2]);
 
   // ─── COMPARISON ANALYSIS ───────────────────────────────────────────────────
   // 1. Overlap (Common items) - Matched by market_name
@@ -233,6 +347,9 @@ function InventoryViewer({ player, comparedPlayer }) {
   const exclusive1 = getExclusiveItems(items1, items2);
   const exclusive2 = getExclusiveItems(items2, items1);
 
+  const sortedExclusive1 = getSortedItems(getFilteredItems(exclusive1, search1, category1, marketFilter1, tradeFilter1), sortBy1);
+  const sortedExclusive2 = getSortedItems(getFilteredItems(exclusive2, search2, category2, marketFilter2, tradeFilter2), sortBy2);
+
   // 3. Category Breakdown counts
   const getCategoryBreakdown = () => {
     const breakdown = {};
@@ -252,7 +369,16 @@ function InventoryViewer({ player, comparedPlayer }) {
   const breakdownStats = getCategoryBreakdown();
 
   // Helper to render inventory grid
-  const renderInventoryGrid = (items, page, totalPages, setPage, search, setSearch, category, setCategory, categories, title, pName, avatar, pageSize, setPageSize) => {
+  const renderInventoryGrid = (
+    items, page, totalPages, setPage, 
+    search, setSearch, 
+    category, setCategory, categories, 
+    marketFilter, setMarketFilter,
+    tradeFilter, setTradeFilter,
+    sortBy, setSortBy,
+    title, pName, avatar, 
+    pageSize, setPageSize
+  ) => {
     return (
       <div style={{ flex: 1 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
@@ -265,14 +391,14 @@ function InventoryViewer({ player, comparedPlayer }) {
         </div>
 
         {/* Filters and search */}
-        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
           <input
             type="text"
             placeholder={`Search ${pName}'s items...`}
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             style={{
-              flex: 1, minWidth: '150px', padding: '0.4rem 0.75rem', borderRadius: '6px',
+              flex: 2, minWidth: '150px', padding: '0.45rem 0.75rem', borderRadius: '6px',
               border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(15,23,42,0.6)',
               color: '#f8fafc', fontSize: '0.82rem'
             }}
@@ -282,16 +408,60 @@ function InventoryViewer({ player, comparedPlayer }) {
               value={category}
               onChange={(e) => { setCategory(e.target.value); setPage(1); }}
               style={{
-                padding: '0.4rem 0.75rem', borderRadius: '6px',
+                flex: 1, minWidth: '100px', padding: '0.45rem 0.75rem', borderRadius: '6px',
                 border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(15,23,42,0.6)',
                 color: '#cbd5e1', fontSize: '0.82rem', cursor: 'pointer'
               }}
             >
-              {categories.map(cat => (
+              <option value="All">All Types</option>
+              {categories.filter(c => c !== 'All').map(cat => (
                 <option key={cat} value={cat}>{cat}</option>
               ))}
             </select>
           )}
+          <select
+            value={marketFilter}
+            onChange={(e) => { setMarketFilter(e.target.value); setPage(1); }}
+            style={{
+              flex: 1, minWidth: '100px', padding: '0.45rem 0.75rem', borderRadius: '6px',
+              border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(15,23,42,0.6)',
+              color: '#cbd5e1', fontSize: '0.82rem', cursor: 'pointer'
+            }}
+          >
+            <option value="all">Marketable (All)</option>
+            <option value="marketable">Marketable Only</option>
+            <option value="unmarketable">Non-Marketable</option>
+          </select>
+          <select
+            value={tradeFilter}
+            onChange={(e) => { setTradeFilter(e.target.value); setPage(1); }}
+            style={{
+              flex: 1, minWidth: '100px', padding: '0.45rem 0.75rem', borderRadius: '6px',
+              border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(15,23,42,0.6)',
+              color: '#cbd5e1', fontSize: '0.82rem', cursor: 'pointer'
+            }}
+          >
+            <option value="all">Tradable (All)</option>
+            <option value="tradable">Tradable Only</option>
+            <option value="untradable">Non-Tradable</option>
+          </select>
+          <select
+            value={sortBy}
+            onChange={(e) => { setSortBy(e.target.value); setPage(1); }}
+            style={{
+              flex: 1, minWidth: '120px', padding: '0.45rem 0.75rem', borderRadius: '6px',
+              border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(15,23,42,0.6)',
+              color: '#cbd5e1', fontSize: '0.82rem', cursor: 'pointer'
+            }}
+          >
+            <option value="default">Sort: Default</option>
+            <option value="name-asc">Name: A-Z</option>
+            <option value="name-desc">Name: Z-A</option>
+            <option value="qty-desc">Quantity: High-Low</option>
+            <option value="qty-asc">Quantity: Low-High</option>
+            <option value="price-desc">Price: High-Low</option>
+            <option value="price-asc">Price: Low-High</option>
+          </select>
         </div>
 
         {items.length === 0 ? (
@@ -517,7 +687,7 @@ function InventoryViewer({ player, comparedPlayer }) {
           </div>
         ) : inv1 ? (
           renderInventoryGrid(
-            filtered1,
+            sorted1,
             page1,
             totalPages1,
             setPage1,
@@ -526,6 +696,12 @@ function InventoryViewer({ player, comparedPlayer }) {
             category1,
             setCategory1,
             cats1,
+            marketFilter1,
+            setMarketFilter1,
+            tradeFilter1,
+            setTradeFilter1,
+            sortBy1,
+            setSortBy1,
             `${player?.persona_name || 'Your'} Inventory`,
             player?.persona_name || 'You',
             player?.avatar_url,
@@ -770,15 +946,21 @@ function InventoryViewer({ player, comparedPlayer }) {
                   {/* Left Column: Only Player 1 */}
                   <div style={{ flex: 1, minWidth: '280px' }}>
                     {renderInventoryGrid(
-                      exclusive1,
+                      sortedExclusive1,
                       page1, // reuse page/pagination locally in rendering helper
-                      Math.ceil(exclusive1.length / pageSize1),
+                      Math.ceil(sortedExclusive1.length / pageSize1),
                       setPage1,
                       search1,
                       setSearch1,
                       category1,
                       setCategory1,
                       cats1,
+                      marketFilter1,
+                      setMarketFilter1,
+                      tradeFilter1,
+                      setTradeFilter1,
+                      sortBy1,
+                      setSortBy1,
                       `Only ${player?.persona_name || 'You'}`,
                       player?.persona_name || 'You',
                       player?.avatar_url,
@@ -790,15 +972,21 @@ function InventoryViewer({ player, comparedPlayer }) {
                   {/* Right Column: Only Player 2 */}
                   <div style={{ flex: 1, minWidth: '280px' }}>
                     {renderInventoryGrid(
-                      exclusive2,
+                      sortedExclusive2,
                       page2,
-                      Math.ceil(exclusive2.length / pageSize2),
+                      Math.ceil(sortedExclusive2.length / pageSize2),
                       setPage2,
                       search2,
                       setSearch2,
                       category2,
                       setCategory2,
                       cats2,
+                      marketFilter2,
+                      setMarketFilter2,
+                      tradeFilter2,
+                      setTradeFilter2,
+                      sortBy2,
+                      setSortBy2,
                       `Only ${comparedPlayer.persona_name}`,
                       comparedPlayer.persona_name,
                       comparedPlayer.avatar_url,
