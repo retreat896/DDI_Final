@@ -13,7 +13,36 @@ const CDN_BASE = 'https://steamcommunity-a.akamaihd.net/economy/image/';
 
 function InventoryViewer({ player, comparedPlayer }) {
   const [selectedGame, setSelectedGame] = useState(GAMES[0]);
+  const [prices, setPrices] = useState({}); // market_hash_name -> { lowest, median, loading, error }
   
+  const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:5000';
+
+  const fetchPrice = async (marketHashName, appid) => {
+    setPrices(prev => ({
+      ...prev,
+      [marketHashName]: { loading: true }
+    }));
+    try {
+      const res = await axios.get(`${API_BASE}/api/market/price?appid=${appid}&market_hash_name=${encodeURIComponent(marketHashName)}`);
+      setPrices(prev => ({
+        ...prev,
+        [marketHashName]: {
+          loading: false,
+          lowest: res.data.lowest_price || res.data.median_price || 'N/A',
+          median: res.data.median_price || 'N/A'
+        }
+      }));
+    } catch (err) {
+      setPrices(prev => ({
+        ...prev,
+        [marketHashName]: {
+          loading: false,
+          error: err.response?.data?.error || 'Error'
+        }
+      }));
+    }
+  };
+
   const [inv1, setInv1] = useState(null);
   const [loading1, setLoading1] = useState(false);
   const [error1, setError1] = useState('');
@@ -32,11 +61,9 @@ function InventoryViewer({ player, comparedPlayer }) {
   const [category2, setCategory2] = useState('All');
   const [page2, setPage2] = useState(1);
 
-  // Active comparison tab
   const [compareTab, setCompareTab] = useState('summary'); // 'summary' | 'overlap' | 'exclusive'
-
-  const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:5000';
-  const ITEMS_PER_PAGE = 16;
+  const [pageSize1, setPageSize1] = useState(32);
+  const [pageSize2, setPageSize2] = useState(32);
 
   // ─── Fetch Primary Player Inventory ─────────────────────────────────────────
   useEffect(() => {
@@ -169,16 +196,16 @@ function InventoryViewer({ player, comparedPlayer }) {
   const filtered2 = getFilteredItems(items2, search2, category2);
 
   // Pagination bounds
-  const getPaginatedItems = (items, page) => {
-    const start = (page - 1) * ITEMS_PER_PAGE;
-    return items.slice(start, start + ITEMS_PER_PAGE);
+  const getPaginatedItems = (items, page, size) => {
+    const start = (page - 1) * size;
+    return items.slice(start, start + size);
   };
 
-  const paginated1 = getPaginatedItems(filtered1, page1);
-  const paginated2 = getPaginatedItems(filtered2, page2);
+  const paginated1 = getPaginatedItems(filtered1, page1, pageSize1);
+  const paginated2 = getPaginatedItems(filtered2, page2, pageSize2);
 
-  const totalPages1 = Math.ceil(filtered1.length / ITEMS_PER_PAGE);
-  const totalPages2 = Math.ceil(filtered2.length / ITEMS_PER_PAGE);
+  const totalPages1 = Math.ceil(filtered1.length / pageSize1);
+  const totalPages2 = Math.ceil(filtered2.length / pageSize2);
 
   // ─── COMPARISON ANALYSIS ───────────────────────────────────────────────────
   // 1. Overlap (Common items) - Matched by market_name
@@ -225,7 +252,7 @@ function InventoryViewer({ player, comparedPlayer }) {
   const breakdownStats = getCategoryBreakdown();
 
   // Helper to render inventory grid
-  const renderInventoryGrid = (items, page, totalPages, setPage, search, setSearch, category, setCategory, categories, title, pName, avatar) => {
+  const renderInventoryGrid = (items, page, totalPages, setPage, search, setSearch, category, setCategory, categories, title, pName, avatar, pageSize, setPageSize) => {
     return (
       <div style={{ flex: 1 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
@@ -279,7 +306,7 @@ function InventoryViewer({ player, comparedPlayer }) {
               gap: '0.5rem',
               marginBottom: '1rem'
             }}>
-              {getPaginatedItems(items, page).map((item) => {
+              {getPaginatedItems(items, page, pageSize).map((item) => {
                 const imgUrl = item.icon_url ? `${CDN_BASE}${item.icon_url}/96fx96f` : '';
                 const type = getItemType(item);
                 const color = item.name_color ? `#${item.name_color}` : '#e2e8f0';
@@ -352,6 +379,52 @@ function InventoryViewer({ player, comparedPlayer }) {
                     }}>
                       {item.name}
                     </span>
+
+                    {item.marketable === 1 && (
+                      <div
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!prices[item.market_hash_name] || prices[item.market_hash_name].error) {
+                            fetchPrice(item.market_hash_name, selectedGame.id);
+                          }
+                        }}
+                        style={{
+                          marginTop: '0.35rem',
+                          fontSize: '0.68rem',
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          background: prices[item.market_hash_name]?.loading
+                            ? 'rgba(255,255,255,0.08)'
+                            : prices[item.market_hash_name]?.lowest
+                              ? 'rgba(16,185,129,0.15)'
+                              : 'rgba(255,255,255,0.05)',
+                          color: prices[item.market_hash_name]?.lowest
+                            ? '#34d399'
+                            : prices[item.market_hash_name]?.error
+                              ? '#f87171'
+                              : '#94a3b8',
+                          border: `1px solid ${
+                            prices[item.market_hash_name]?.lowest
+                              ? 'rgba(16,185,129,0.3)'
+                              : prices[item.market_hash_name]?.error
+                                ? 'rgba(239,68,68,0.3)'
+                                : 'rgba(255,255,255,0.1)'
+                          }`,
+                          display: 'inline-block',
+                          cursor: 'pointer',
+                          fontWeight: 600,
+                        }}
+                        title={
+                          prices[item.market_hash_name]?.lowest
+                            ? `Lowest Price: ${prices[item.market_hash_name].lowest}\nMedian Price: ${prices[item.market_hash_name].median}\nClick to refresh`
+                            : prices[item.market_hash_name]?.error
+                              ? `Error: ${prices[item.market_hash_name].error}. Click to retry.`
+                              : 'Click to fetch market price'
+                        }
+                      >
+                        {prices[item.market_hash_name]?.loading ? '...' : prices[item.market_hash_name]?.lowest ? prices[item.market_hash_name].lowest : '$ Price'}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -359,7 +432,7 @@ function InventoryViewer({ player, comparedPlayer }) {
 
             {/* Pagination Controls */}
             {totalPages > 1 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                 <button
                   onClick={() => setPage(p => Math.max(p - 1, 1))}
                   disabled={page === 1}
@@ -368,9 +441,25 @@ function InventoryViewer({ player, comparedPlayer }) {
                 >
                   ◀ Prev
                 </button>
-                <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                  Page {page} of {totalPages}
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                    Page {page} of {totalPages}
+                  </span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
+                    style={{
+                      padding: '0.2rem 0.4rem', borderRadius: '4px',
+                      border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(15,23,42,0.8)',
+                      color: '#cbd5e1', fontSize: '0.7rem', cursor: 'pointer'
+                    }}
+                  >
+                    <option value={16}>16 / page</option>
+                    <option value={32}>32 / page</option>
+                    <option value={64}>64 / page</option>
+                    <option value={128}>128 / page</option>
+                  </select>
+                </div>
                 <button
                   onClick={() => setPage(p => Math.min(p + 1, totalPages))}
                   disabled={page === totalPages}
@@ -439,7 +528,9 @@ function InventoryViewer({ player, comparedPlayer }) {
             cats1,
             `${player?.persona_name || 'Your'} Inventory`,
             player?.persona_name || 'You',
-            player?.avatar_url
+            player?.avatar_url,
+            pageSize1,
+            setPageSize1
           )
         ) : (
           <div style={{ textAlign: 'center', padding: '2rem', color: '#64748b', fontSize: '0.88rem' }}>
@@ -619,6 +710,51 @@ function InventoryViewer({ player, comparedPlayer }) {
                                 <span style={{ color: '#fbbf24' }}>{comparedPlayer.persona_name}: <strong>{amount2}</strong></span>
                               </div>
                             </div>
+
+                            {item.marketable === 1 && (
+                              <div
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (!prices[item.market_hash_name] || prices[item.market_hash_name].error) {
+                                    fetchPrice(item.market_hash_name, selectedGame.id);
+                                  }
+                                }}
+                                style={{
+                                  fontSize: '0.68rem',
+                                  padding: '4px 8px',
+                                  borderRadius: '4px',
+                                  background: prices[item.market_hash_name]?.loading
+                                    ? 'rgba(255,255,255,0.08)'
+                                    : prices[item.market_hash_name]?.lowest
+                                      ? 'rgba(16,185,129,0.15)'
+                                      : 'rgba(255,255,255,0.05)',
+                                  color: prices[item.market_hash_name]?.lowest
+                                    ? '#34d399'
+                                    : prices[item.market_hash_name]?.error
+                                      ? '#f87171'
+                                      : '#94a3b8',
+                                  border: `1px solid ${
+                                    prices[item.market_hash_name]?.lowest
+                                      ? 'rgba(16,185,129,0.3)'
+                                      : prices[item.market_hash_name]?.error
+                                        ? 'rgba(239,68,68,0.3)'
+                                        : 'rgba(255,255,255,0.1)'
+                                  }`,
+                                  cursor: 'pointer',
+                                  fontWeight: 600,
+                                  whiteSpace: 'nowrap'
+                                }}
+                                title={
+                                  prices[item.market_hash_name]?.lowest
+                                    ? `Lowest Price: ${prices[item.market_hash_name].lowest}\nMedian Price: ${prices[item.market_hash_name].median}\nClick to refresh`
+                                    : prices[item.market_hash_name]?.error
+                                      ? `Error: ${prices[item.market_hash_name].error}. Click to retry.`
+                                      : 'Click to fetch market price'
+                                }
+                              >
+                                {prices[item.market_hash_name]?.loading ? '...' : prices[item.market_hash_name]?.lowest ? prices[item.market_hash_name].lowest : '$ Price'}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
@@ -636,7 +772,7 @@ function InventoryViewer({ player, comparedPlayer }) {
                     {renderInventoryGrid(
                       exclusive1,
                       page1, // reuse page/pagination locally in rendering helper
-                      Math.ceil(exclusive1.length / ITEMS_PER_PAGE),
+                      Math.ceil(exclusive1.length / pageSize1),
                       setPage1,
                       search1,
                       setSearch1,
@@ -645,7 +781,9 @@ function InventoryViewer({ player, comparedPlayer }) {
                       cats1,
                       `Only ${player?.persona_name || 'You'}`,
                       player?.persona_name || 'You',
-                      player?.avatar_url
+                      player?.avatar_url,
+                      pageSize1,
+                      setPageSize1
                     )}
                   </div>
 
@@ -654,7 +792,7 @@ function InventoryViewer({ player, comparedPlayer }) {
                     {renderInventoryGrid(
                       exclusive2,
                       page2,
-                      Math.ceil(exclusive2.length / ITEMS_PER_PAGE),
+                      Math.ceil(exclusive2.length / pageSize2),
                       setPage2,
                       search2,
                       setSearch2,
@@ -663,7 +801,9 @@ function InventoryViewer({ player, comparedPlayer }) {
                       cats2,
                       `Only ${comparedPlayer.persona_name}`,
                       comparedPlayer.persona_name,
-                      comparedPlayer.avatar_url
+                      comparedPlayer.avatar_url,
+                      pageSize2,
+                      setPageSize2
                     )}
                   </div>
 

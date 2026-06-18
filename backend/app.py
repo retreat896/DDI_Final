@@ -277,6 +277,63 @@ def get_inventory(steamid):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+import time
+price_cache = {}  # key -> (data, timestamp)
+
+@app.route('/api/market/price')
+def get_market_price():
+    """
+    Retrieve the lowest market price for a Steam Community item.
+    ---
+    parameters:
+      - name: appid
+        in: query
+        type: string
+        required: true
+        example: "730"
+      - name: market_hash_name
+        in: query
+        type: string
+        required: true
+        example: "Chroma 3 Case Key"
+    responses:
+      200:
+        description: Item pricing details.
+      404:
+        description: Item not found.
+      429:
+        description: Rate limit exceeded.
+    """
+    appid = request.args.get('appid')
+    market_hash_name = request.args.get('market_hash_name')
+    if not appid or not market_hash_name:
+        return jsonify({"error": "appid and market_hash_name are required"}), 400
+
+    cache_key = f"{appid}_{market_hash_name}"
+    now = time.time()
+    if cache_key in price_cache:
+        cached_data, cached_time = price_cache[cache_key]
+        if now - cached_time < 600:  # 10 minutes cache
+            return jsonify(cached_data)
+
+    url = f"https://steamcommunity.com/market/priceoverview/?appid={appid}&market_hash_name={urllib.parse.quote(market_hash_name)}&currency=1"
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    }
+    try:
+        r = requests.get(url, headers=headers, timeout=10)
+        if r.status_code == 200:
+            data = r.json()
+            if data and data.get('success'):
+                price_cache[cache_key] = (data, now)
+                return jsonify(data)
+            return jsonify({"error": "Item not found on Steam Market"}), 404
+        elif r.status_code == 429:
+            return jsonify({"error": "Steam Market API rate limit exceeded. Please try again in a minute."}), 429
+        return jsonify({"error": "Failed to fetch price from Steam Market", "status_code": r.status_code}), r.status_code
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/analytics/genres')
 def analytics_genres():
     """

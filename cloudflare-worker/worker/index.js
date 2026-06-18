@@ -196,6 +196,45 @@ app.get('/api/inventory/:steamid', async (c) => {
   return jsonErr('Failed to fetch inventory from Steam', res.status);
 });
 
+const priceCache = new Map();
+
+app.get('/api/market/price', async (c) => {
+  const appid = c.req.query('appid');
+  const market_hash_name = c.req.query('market_hash_name');
+  if (!appid || !market_hash_name) {
+    return jsonErr('appid and market_hash_name are required', 400);
+  }
+
+  const cacheKey = `${appid}_${market_hash_name}`;
+  const now = Date.now();
+  if (priceCache.has(cacheKey)) {
+    const cached = priceCache.get(cacheKey);
+    // Cache for 10 minutes
+    if (now - cached.timestamp < 10 * 60 * 1000) {
+      return Response.json(cached.data);
+    }
+  }
+
+  const url = `https://steamcommunity.com/market/priceoverview/?appid=${appid}&market_hash_name=${encodeURIComponent(market_hash_name)}&currency=1`;
+  const res = await fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    }
+  });
+
+  if (res.status === 200) {
+    const data = await res.json();
+    if (data && data.success) {
+      priceCache.set(cacheKey, { data, timestamp: now });
+      return Response.json(data);
+    }
+    return jsonErr('Item not found on Steam Market', 404);
+  } else if (res.status === 429) {
+    return jsonErr('Steam Market API rate limit exceeded. Please try again in a minute.', 429);
+  }
+  return jsonErr('Failed to fetch price from Steam Market', res.status);
+});
+
 // ═══════════════════════════════════════════════════════════════════════════
 //  ANALYTICS  — all read from D1 (SQLite)
 //
