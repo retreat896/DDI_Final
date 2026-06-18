@@ -207,14 +207,44 @@ app.get('/api/market/price', async (c) => {
 
   const cacheKey = `${appid}_${market_hash_name}`;
   const now = Date.now();
+  
+  // 1. First level: check fast in-memory cache (10 mins)
   if (priceCache.has(cacheKey)) {
     const cached = priceCache.get(cacheKey);
-    // Cache for 10 minutes
     if (now - cached.timestamp < 10 * 60 * 1000) {
       return Response.json(cached.data);
     }
   }
 
+  // 2. Second level: check D1 database cache (6 hours)
+  let cachedRow = null;
+  try {
+    cachedRow = await c.env.DB.prepare(`
+      SELECT lowest_price, median_price, updated_at
+      FROM market_item_prices
+      WHERE appid = ? AND market_hash_name = ?
+    `).bind(appid, market_hash_name).first();
+  } catch (dbErr) {
+    console.error('D1 read error:', dbErr);
+  }
+
+  if (cachedRow) {
+    const updatedAtStr = cachedRow.updated_at;
+    const updatedAtMs = Date.parse(updatedAtStr.replace(' ', 'T') + 'Z') || Date.parse(updatedAtStr);
+    const ageMs = now - updatedAtMs;
+    
+    if (ageMs < 6 * 60 * 60 * 1000) {
+      const responseData = {
+        success: true,
+        lowest_price: cachedRow.lowest_price,
+        median_price: cachedRow.median_price
+      };
+      priceCache.set(cacheKey, { data: responseData, timestamp: now });
+      return Response.json(responseData);
+    }
+  }
+
+  // 3. Cache miss/stale: fetch from Steam API
   const url = `https://steamcommunity.com/market/priceoverview/?appid=${appid}&market_hash_name=${encodeURIComponent(market_hash_name)}&currency=1`;
   const res = await fetch(url, {
     headers: {
@@ -225,13 +255,54 @@ app.get('/api/market/price', async (c) => {
   if (res.status === 200) {
     const data = await res.json();
     if (data && data.success) {
+      const lowest = data.lowest_price || null;
+      const median = data.median_price || null;
+      
+      // Save/Update D1 cache
+      try {
+        await c.env.DB.prepare(`
+          INSERT INTO market_item_prices (appid, market_hash_name, lowest_price, median_price, updated_at)
+          VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+          ON CONFLICT (appid, market_hash_name) DO UPDATE SET
+            lowest_price = excluded.lowest_price,
+            median_price = excluded.median_price,
+            updated_at = CURRENT_TIMESTAMP
+        `).bind(appid, market_hash_name, lowest, median).run();
+      } catch (dbErr) {
+        console.error('D1 write error:', dbErr);
+      }
+
       priceCache.set(cacheKey, { data, timestamp: now });
       return Response.json(data);
     }
     return jsonErr('Item not found on Steam Market', 404);
   } else if (res.status === 429) {
+    // Fallback to stale cache if rate limited
+    if (cachedRow) {
+      const fallbackData = {
+        success: true,
+        lowest_price: cachedRow.lowest_price,
+        median_price: cachedRow.median_price,
+        stale: true
+      };
+      priceCache.set(cacheKey, { data: fallbackData, timestamp: now });
+      return Response.json(fallbackData);
+    }
     return jsonErr('Steam Market API rate limit exceeded. Please try again in a minute.', 429);
   }
+
+  // Fallback to stale cache on any other errors
+  if (cachedRow) {
+    const fallbackData = {
+      success: true,
+      lowest_price: cachedRow.lowest_price,
+      median_price: cachedRow.median_price,
+      stale: true
+    };
+    priceCache.set(cacheKey, { data: fallbackData, timestamp: now });
+    return Response.json(fallbackData);
+  }
+
   return jsonErr('Failed to fetch price from Steam Market', res.status);
 });
 

@@ -35,10 +35,72 @@ function InventoryViewer({ player, comparedPlayer }) {
     }
     return {};
   });
+
+  const [requestTimestamps, setRequestTimestamps] = useState(() => {
+    try {
+      const cached = localStorage.getItem('steam_request_timestamps');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        const now = Date.now();
+        return parsed.filter(t => now - t < 60 * 1000);
+      }
+    } catch {}
+    return [];
+  });
+  const [cooldownTime, setCooldownTime] = useState(0);
+
+  // Cooldown countdown timer effect
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const now = Date.now();
+      
+      setRequestTimestamps(prev => {
+        const filtered = prev.filter(t => now - t < 60 * 1000);
+        try {
+          localStorage.setItem('steam_request_timestamps', JSON.stringify(filtered));
+        } catch {}
+        
+        if (filtered.length >= 20) {
+          const oldest = filtered[0];
+          const remaining = Math.ceil((60 * 1000 - (now - oldest)) / 1000);
+          setCooldownTime(remaining > 0 ? remaining : 0);
+        } else {
+          setCooldownTime(0);
+        }
+        
+        return filtered;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
   
   const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:5000';
 
   const fetchPrice = async (marketHashName, appid) => {
+    const now = Date.now();
+    let currentTimestamps = [];
+    setRequestTimestamps(prev => {
+      const filtered = prev.filter(t => now - t < 60 * 1000);
+      currentTimestamps = filtered;
+      return filtered;
+    });
+
+    if (currentTimestamps.length >= 20) {
+      const oldest = currentTimestamps[0];
+      const remaining = Math.ceil((60 * 1000 - (now - oldest)) / 1000);
+      setCooldownTime(remaining);
+      return;
+    }
+
+    setRequestTimestamps(prev => {
+      const updated = [...prev, now];
+      try {
+        localStorage.setItem('steam_request_timestamps', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
     setPrices(prev => ({
       ...prev,
       [marketHashName]: { ...prev[marketHashName], loading: true }
@@ -294,6 +356,8 @@ function InventoryViewer({ player, comparedPlayer }) {
   const totalPages2 = Math.ceil(sorted2.length / pageSize2);
 
   useEffect(() => {
+    if (cooldownTime > 0 || requestTimestamps.length >= 20) return;
+
     const visibleItems = [
       ...paginated1.filter(item => item.marketable === 1 && !prices[item.market_hash_name]),
       ...paginated2.filter(item => item.marketable === 1 && !prices[item.market_hash_name])
@@ -306,6 +370,14 @@ function InventoryViewer({ player, comparedPlayer }) {
     const fetchSequentially = async () => {
       for (const item of visibleItems) {
         if (!active) break;
+        
+        let currentLen = 0;
+        setRequestTimestamps(prev => {
+          currentLen = prev.length;
+          return prev;
+        });
+        if (currentLen >= 20) break;
+
         if (!prices[item.market_hash_name]) {
           await fetchPrice(item.market_hash_name, selectedGame.id);
           await new Promise(resolve => setTimeout(resolve, 350));
@@ -319,7 +391,7 @@ function InventoryViewer({ player, comparedPlayer }) {
       active = false;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paginated1, paginated2]);
+  }, [paginated1, paginated2, cooldownTime]);
 
   // ─── COMPARISON ANALYSIS ───────────────────────────────────────────────────
   // 1. Overlap (Common items) - Matched by market_name
@@ -657,6 +729,20 @@ function InventoryViewer({ player, comparedPlayer }) {
             <p style={{ color: '#64748b', fontSize: '0.8rem', margin: 0 }}>
               Browse and filter community items, trading cards, and skins.
             </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.4rem', fontSize: '0.75rem' }}>
+              <span style={{
+                width: '8px', height: '8px', borderRadius: '50%',
+                background: cooldownTime > 0 ? '#ef4444' : requestTimestamps.length >= 15 ? '#f59e0b' : '#10b981',
+                boxShadow: cooldownTime > 0 ? '0 0 8px #ef4444' : 'none',
+                display: 'inline-block',
+                transition: 'background 0.3s ease'
+              }} />
+              <span style={{ color: cooldownTime > 0 ? '#f87171' : '#94a3b8', fontWeight: 600 }}>
+                {cooldownTime > 0 
+                  ? `Cooldown Active: Throttling requests. Resuming in ${cooldownTime}s` 
+                  : `API rate-limit tracker: ${requestTimestamps.length} / 20 requests/min`}
+              </span>
+            </div>
           </div>
 
           {/* Game Selector TabBar inside card */}

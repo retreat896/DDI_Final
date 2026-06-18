@@ -14,6 +14,28 @@ import threading
 
 load_dotenv()
 
+def init_db():
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute(f"""
+                CREATE TABLE IF NOT EXISTS "{DB_SCHEMA}"."market_item_prices" (
+                    appid VARCHAR(255) NOT NULL,
+                    market_hash_name VARCHAR(255) NOT NULL,
+                    lowest_price VARCHAR(255),
+                    median_price VARCHAR(255),
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (appid, market_hash_name)
+                );
+            """)
+            conn.commit()
+        conn.close()
+        print("Database cache tables initialized successfully.")
+    except Exception as e:
+        print(f"Error initializing database tables: {e}")
+
+init_db()
+
 app = Flask(__name__)
 # Enable CORS for local development
 CORS(app, supports_credentials=True, origins=["http://localhost:5173", "http://127.0.0.1:5173"])
@@ -278,7 +300,7 @@ def get_inventory(steamid):
         return jsonify({"error": str(e)}), 500
 
 import time
-price_cache = {}  # key -> (data, timestamp)
+from datetime import datetime
 
 @app.route('/api/market/price')
 def get_market_price():
@@ -309,13 +331,38 @@ def get_market_price():
     if not appid or not market_hash_name:
         return jsonify({"error": "appid and market_hash_name are required"}), 400
 
-    cache_key = f"{appid}_{market_hash_name}"
-    now = time.time()
-    if cache_key in price_cache:
-        cached_data, cached_time = price_cache[cache_key]
-        if now - cached_time < 600:  # 10 minutes cache
-            return jsonify(cached_data)
+    # 1. Check database cache first
+    cached_row = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(f"""
+                SELECT lowest_price, median_price, updated_at
+                FROM "{DB_SCHEMA}"."market_item_prices"
+                WHERE appid = %s AND market_hash_name = %s
+            """, (appid, market_hash_name))
+            cached_row = cur.fetchone()
+        conn.close()
+    except Exception as db_err:
+        print(f"Database read error: {db_err}")
 
+    # If cache exists and is fresh (less than 6 hours old), return it
+    if cached_row:
+        updated_at = cached_row['updated_at']
+        if updated_at.tzinfo is not None:
+            from datetime import timezone
+            now = datetime.now(timezone.utc)
+        else:
+            now = datetime.now()
+        age = now - updated_at
+        if age.total_seconds() < 6 * 3600:
+            return jsonify({
+                "success": True,
+                "lowest_price": cached_row['lowest_price'],
+                "median_price": cached_row['median_price']
+            })
+
+    # 2. Cache miss or stale: Fetch from Steam API
     url = f"https://steamcommunity.com/market/priceoverview/?appid={appid}&market_hash_name={urllib.parse.quote(market_hash_name)}&currency=1"
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
@@ -325,14 +372,60 @@ def get_market_price():
         if r.status_code == 200:
             data = r.json()
             if data and data.get('success'):
-                price_cache[cache_key] = (data, now)
+                lowest = data.get('lowest_price')
+                median = data.get('median_price')
+                # Save/Update database cache
+                try:
+                    conn = get_db_connection()
+                    with conn.cursor() as cur:
+                        cur.execute(f"""
+                            INSERT INTO "{DB_SCHEMA}"."market_item_prices" (appid, market_hash_name, lowest_price, median_price, updated_at)
+                            VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP)
+                            ON CONFLICT (appid, market_hash_name) DO UPDATE SET
+                                lowest_price = EXCLUDED.lowest_price,
+                                median_price = EXCLUDED.median_price,
+                                updated_at = CURRENT_TIMESTAMP;
+                        """, (appid, market_hash_name, lowest, median))
+                        conn.commit()
+                    conn.close()
+                except Exception as db_err:
+                    print(f"Database write error: {db_err}")
+
                 return jsonify(data)
             return jsonify({"error": "Item not found on Steam Market"}), 404
+        
         elif r.status_code == 429:
+            # Rate limit hit: fallback to stale cached row if we have one
+            if cached_row:
+                return jsonify({
+                    "success": True,
+                    "lowest_price": cached_row['lowest_price'],
+                    "median_price": cached_row['median_price'],
+                    "stale": True
+                })
             return jsonify({"error": "Steam Market API rate limit exceeded. Please try again in a minute."}), 429
+            
+        # Other failures: fallback to stale cache if we have one
+        if cached_row:
+            return jsonify({
+                "success": True,
+                "lowest_price": cached_row['lowest_price'],
+                "median_price": cached_row['median_price'],
+                "stale": True
+            })
         return jsonify({"error": "Failed to fetch price from Steam Market", "status_code": r.status_code}), r.status_code
+        
     except Exception as e:
+        # Request exception: fallback to stale cache if we have one
+        if cached_row:
+            return jsonify({
+                "success": True,
+                "lowest_price": cached_row['lowest_price'],
+                "median_price": cached_row['median_price'],
+                "stale": True
+            })
         return jsonify({"error": str(e)}), 500
+
 
 @app.route('/api/analytics/genres')
 def analytics_genres():
